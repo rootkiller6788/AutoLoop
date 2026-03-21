@@ -26,6 +26,28 @@ That means:
 AutoLoop is for people who want more than "agent demos".  
 It is for building **AI systems that can be governed**.
 
+## Why AutoLoop exists
+
+Most agent systems optimize for:
+
+- more tools
+- longer chains
+- more autonomy
+- prettier demos
+
+AutoLoop optimizes for something else:
+
+- **controlled execution**
+- **verifiable outcomes**
+- **runtime governance**
+- **learning with trust boundaries**
+- **operator visibility and replay**
+
+In other words:
+
+> **AutoLoop is not another free-form agent wrapper.  
+> It is a governed execution runtime for AI systems.**
+
 
 ## 5-Minute Demo
 
