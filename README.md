@@ -8,8 +8,6 @@
 
 AutoLoop helps you turn a vague task into a governed agent loop with planning, execution, verification, and memory in one Rust + SpacetimeDB runtime.
 
-![AutoLoop banner](Gemini_Generated_Image_evurkkevurkkevur.png)
-
 ## 5-Minute Demo
 
 - Windows: [demo/e2e-5min.ps1](demo/e2e-5min.ps1)
