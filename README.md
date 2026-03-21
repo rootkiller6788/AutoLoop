@@ -6,7 +6,26 @@
 
 <img width="1375" height="768" alt="image" src="https://github.com/user-attachments/assets/97f8049d-a04f-40d1-884d-e1549b8b3453" />
 
-AutoLoop helps you turn a vague task into a governed agent loop with planning, execution, verification, and memory in one Rust + SpacetimeDB runtime.
+## What is AutoLoop?
+
+**AutoLoop is a Rust-native AIOS for governed agent execution.**
+
+It does not just call models and tools.  
+It turns ambiguous intent into a **controlled runtime loop**:
+
+**clarify → plan → gate → execute → verify → remember → replay → improve**
+
+That means:
+
+- **vague tasks become structured sessions**
+- **all execution goes through policy and runtime guards**
+- **results can be verified, audited, and replayed**
+- **memory is not passive storage — it feeds future reasoning**
+- **learning only upgrades when trust conditions are met**
+
+AutoLoop is for people who want more than "agent demos".  
+It is for building **AI systems that can be governed**.
+
 
 ## 5-Minute Demo
 
