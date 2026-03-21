@@ -3,6 +3,7 @@ pub mod adaptive_framework;
 pub mod agentevolver_task_core;
 pub mod bus;
 pub mod config;
+pub mod contracts;
 pub mod dashboard_server;
 pub mod evolution;
 pub mod hooks;
@@ -32,6 +33,7 @@ use evolution::SelfEvolutionKernel;
 use hooks::HookRegistry;
 use memory::{CausalEdge, MemorySubsystem, ReflexionEpisode, SkillRecord, WitnessLog};
 use observability::ObservabilityKernel;
+use observability::event_stream::{ReplayAnalysisReport, append_event};
 use orchestration::{
     AbRoutingStats, ExecutionStats, OrchestrationKernel, current_time_ms, parse_mcp_server,
     update_ab_routing_stats,
@@ -40,9 +42,9 @@ use orchestration::{
 use providers::ProviderRegistry;
 use rag::RagSubsystem;
 use research::ResearchKernel;
-use runtime::RuntimeKernel;
+use runtime::{ReplayRunRequest, RuntimeKernel};
 use security::SecurityPolicy;
-use session::SessionStore;
+use session::{SessionIdentity, SessionStore};
 use tools::{ForgedMcpToolManifest, ToolRegistry};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -58,6 +60,9 @@ pub struct DashboardSessionSnapshot {
     pub research_health: serde_json::Value,
     pub graph: DashboardGraphLens,
     pub verifier: DashboardVerifierLens,
+    pub business: DashboardBusinessLens,
+    pub work_orders: Vec<serde_json::Value>,
+    pub revenue_events: Vec<serde_json::Value>,
     pub operations_notes: Vec<String>,
     pub capability_lifecycle: serde_json::Value,
     pub runtime_circuits: serde_json::Value,
@@ -88,6 +93,17 @@ pub struct DashboardVerifierLens {
     pub score: f32,
     pub summary: String,
     pub failing_tools: Vec<String>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct DashboardBusinessLens {
+    pub revenue_micros: u64,
+    pub cost_micros: u64,
+    pub profit_micros: i64,
+    pub margin_ratio: f32,
+    pub sla_success_ratio: f32,
+    pub breached_orders: usize,
+    pub risk_summary: String,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -164,6 +180,7 @@ impl AutoLoopApp {
             memory.clone(),
             hooks.clone(),
             security.clone(),
+            runtime.clone(),
             spacetimedb.clone(),
         );
 
@@ -216,10 +233,62 @@ impl AutoLoopApp {
     }
 
     pub async fn process_direct(&self, session_id: &str, content: &str) -> Result<String> {
+        self.ensure_default_session_identity(session_id).await?;
         self.agent.process_message(session_id, content).await
     }
 
+    pub async fn ensure_session_identity(
+        &self,
+        session_id: &str,
+        tenant_id: &str,
+        principal_id: &str,
+        policy_id: &str,
+        lease_ttl_ms: u64,
+    ) -> Result<SessionIdentity> {
+        let identity = self
+            .security
+            .issue_session_identity(
+                &self.spacetimedb,
+                session_id,
+                tenant_id,
+                principal_id,
+                policy_id,
+                lease_ttl_ms,
+            )
+            .await?;
+        let expires_at_ms = current_time_ms().saturating_add(lease_ttl_ms);
+        let session_identity = SessionIdentity {
+            tenant_id: identity.tenant_id,
+            principal_id: identity.principal_id,
+            policy_id: identity.policy_id,
+            lease_token: identity.lease_token,
+            expires_at_ms,
+        };
+        self.sessions
+            .bind_identity(session_id, session_identity.clone())
+            .await;
+        Ok(session_identity)
+    }
+
+    async fn ensure_default_session_identity(&self, session_id: &str) -> Result<SessionIdentity> {
+        if let Some(identity) = self.sessions.identity(session_id).await {
+            let now = current_time_ms();
+            if identity.expires_at_ms > now {
+                return Ok(identity);
+            }
+        }
+        self.ensure_session_identity(
+            session_id,
+            "tenant:default",
+            &format!("principal:{session_id}"),
+            "policy:default",
+            3_600_000,
+        )
+        .await
+    }
+
     pub async fn process_requirement_swarm(&self, session_id: &str, content: &str) -> Result<String> {
+        self.ensure_default_session_identity(session_id).await?;
         let research_report = self
             .research
             .run_anchor_research(&self.spacetimedb, session_id, content)
@@ -953,6 +1022,34 @@ impl AutoLoopApp {
             .await?
             .and_then(|record| serde_json::from_str::<serde_json::Value>(&record.value).ok())
             .unwrap_or_else(|| serde_json::json!({}));
+        let business_report = self
+            .spacetimedb
+            .get_knowledge(&format!("observability:{session_id}:business-report"))
+            .await?
+            .and_then(|record| serde_json::from_str::<serde_json::Value>(&record.value).ok())
+            .unwrap_or_else(|| serde_json::json!({}));
+        let work_orders = self
+            .spacetimedb
+            .list_knowledge_by_prefix(&format!("business:work-order:{session_id}:"))
+            .await?
+            .into_iter()
+            .filter_map(|record| serde_json::from_str::<serde_json::Value>(&record.value).ok())
+            .collect::<Vec<_>>();
+        let revenue_events = self
+            .spacetimedb
+            .list_knowledge_by_prefix(&format!("business:revenue-event:{session_id}:"))
+            .await?
+            .into_iter()
+            .filter_map(|record| serde_json::from_str::<serde_json::Value>(&record.value).ok())
+            .collect::<Vec<_>>();
+        let margin_report = business_report
+            .get("margin")
+            .cloned()
+            .unwrap_or_else(|| serde_json::json!({}));
+        let sla_report = business_report
+            .get("sla")
+            .cloned()
+            .unwrap_or_else(|| serde_json::json!({}));
         let snapshot = DashboardSessionSnapshot {
             session_id: session_id.clone(),
             anchor,
@@ -1048,6 +1145,39 @@ impl AutoLoopApp {
                     })
                     .unwrap_or_default(),
             },
+            business: DashboardBusinessLens {
+                revenue_micros: margin_report
+                    .get("recognized_revenue_micros")
+                    .and_then(serde_json::Value::as_u64)
+                    .unwrap_or(0),
+                cost_micros: margin_report
+                    .get("allocated_cost_micros")
+                    .and_then(serde_json::Value::as_u64)
+                    .unwrap_or(0),
+                profit_micros: margin_report
+                    .get("gross_profit_micros")
+                    .and_then(serde_json::Value::as_i64)
+                    .unwrap_or(0),
+                margin_ratio: margin_report
+                    .get("gross_margin_ratio")
+                    .and_then(serde_json::Value::as_f64)
+                    .unwrap_or(0.0) as f32,
+                sla_success_ratio: sla_report
+                    .get("sla_success_ratio")
+                    .and_then(serde_json::Value::as_f64)
+                    .unwrap_or(1.0) as f32,
+                breached_orders: sla_report
+                    .get("breached_orders")
+                    .and_then(serde_json::Value::as_u64)
+                    .unwrap_or(0) as usize,
+                risk_summary: business_report
+                    .get("risk_summary")
+                    .and_then(serde_json::Value::as_str)
+                    .unwrap_or("business risk unavailable")
+                    .to_string(),
+            },
+            work_orders,
+            revenue_events,
             operations_notes: operations_report
                 .get("task_summary")
                 .and_then(serde_json::Value::as_array)
@@ -1112,6 +1242,51 @@ impl AutoLoopApp {
         Ok(serde_json::to_string_pretty(&replay)?)
     }
 
+    pub async fn run_replay_snapshot(&self, snapshot_id: &str) -> Result<String> {
+        let report = self
+            .runtime
+            .replay_from_snapshot(
+                &self.spacetimedb,
+                &self.tools,
+                &self.providers,
+                &ReplayRunRequest {
+                    snapshot_id: snapshot_id.to_string(),
+                },
+            )
+            .await?;
+        Ok(serde_json::to_string_pretty(&report)?)
+    }
+
+    pub async fn export_replay_report(
+        &self,
+        anchor_or_session: &str,
+        snapshot_id: Option<&str>,
+    ) -> Result<String> {
+        let session_id = anchor_or_session.trim_start_matches("anchor:");
+        let prefix = if let Some(snapshot_id) = snapshot_id {
+            format!("replay:analysis:{snapshot_id}:")
+        } else {
+            "replay:analysis:".to_string()
+        };
+        let mut reports = self
+            .spacetimedb
+            .list_knowledge_by_prefix(&prefix)
+            .await?
+            .into_iter()
+            .filter_map(|record| serde_json::from_str::<ReplayAnalysisReport>(&record.value).ok())
+            .filter(|report| report.session_id == session_id)
+            .collect::<Vec<_>>();
+        reports.sort_by_key(|report| report.created_at_ms);
+        let latest = reports.last().cloned();
+        Ok(serde_json::to_string_pretty(&serde_json::json!({
+            "session_id": session_id,
+            "snapshot_id": snapshot_id,
+            "count": reports.len(),
+            "latest": latest,
+            "reports": reports,
+        }))?)
+    }
+
     pub async fn import_mcp_catalog(&self, raw: &str) -> Result<String> {
         let manifests = serde_json::from_str::<Vec<ForgedMcpToolManifest>>(raw)?;
         let mut imported = 0usize;
@@ -1141,6 +1316,50 @@ impl AutoLoopApp {
         }))?)
     }
 
+    pub async fn operator_decision(
+        &self,
+        session_id: &str,
+        approved: bool,
+        reason: &str,
+    ) -> Result<String> {
+        let now = orchestration::current_time_ms();
+        let trace_id = format!("operator:{session_id}:{now}");
+        let decision = if approved { "approved" } else { "rejected" };
+        self.spacetimedb
+            .upsert_json_knowledge(
+                format!("policy:{session_id}:decision:{now}"),
+                &serde_json::json!({
+                    "session_id": session_id,
+                    "trace_id": trace_id,
+                    "decision": decision,
+                    "reason": reason,
+                    "created_at_ms": now,
+                }),
+                "operator-control",
+            )
+            .await?;
+        let _ = append_event(
+            &self.spacetimedb,
+            "policy_decisions",
+            trace_id,
+            session_id.to_string(),
+            None,
+            None,
+            contracts::version::CONTRACT_VERSION,
+            serde_json::json!({
+                "decision": decision,
+                "reason": reason,
+            }),
+        )
+        .await;
+        Ok(serde_json::json!({
+            "status": decision,
+            "session_id": session_id,
+            "reason": reason
+        })
+        .to_string())
+    }
+
     pub async fn export_knowledge(&self, anchor_or_session: &str, export_type: &str) -> Result<String> {
         let session_id = anchor_or_session.trim_start_matches("anchor:");
         if export_type == "index" {
@@ -1153,6 +1372,9 @@ impl AutoLoopApp {
                 format!("conversation:{session_id}:"),
                 format!("protocol:{session_id}:"),
                 format!("observability:{session_id}:"),
+                format!("business:work-order:{session_id}:"),
+                format!("business:revenue-event:{session_id}:"),
+                "replay:analysis:".to_string(),
             ] {
                 keys.extend(
                     self.spacetimedb
@@ -1172,8 +1394,37 @@ impl AutoLoopApp {
             "research" => format!("research:{session_id}:report"),
             "research-follow-up" => format!("research:{session_id}:follow-up-status"),
             "research-proxy" => format!("research:{session_id}:proxy-forensics"),
+            "resilience" => format!("observability:{session_id}:resilience"),
+            "business" => format!("observability:{session_id}:business-report"),
+            "margin" => format!("observability:{session_id}:margin-report"),
+            "sla" => format!("observability:{session_id}:sla-report"),
+            "work-orders" => {
+                let work_orders = self
+                    .spacetimedb
+                    .list_knowledge_by_prefix(&format!("business:work-order:{session_id}:"))
+                    .await?
+                    .into_iter()
+                    .filter_map(|record| serde_json::from_str::<serde_json::Value>(&record.value).ok())
+                    .collect::<Vec<_>>();
+                return Ok(serde_json::to_string_pretty(&work_orders)?);
+            }
+            "revenue" => {
+                let revenue_events = self
+                    .spacetimedb
+                    .list_knowledge_by_prefix(&format!("business:revenue-event:{session_id}:"))
+                    .await?
+                    .into_iter()
+                    .filter_map(|record| serde_json::from_str::<serde_json::Value>(&record.value).ok())
+                    .collect::<Vec<_>>();
+                return Ok(serde_json::to_string_pretty(&revenue_events)?);
+            }
+            "strategy-layers" => {
+                let value = self.memory.strategy_memory_layers(&self.spacetimedb, session_id).await?;
+                return Ok(serde_json::to_string_pretty(&value)?);
+            }
             "dashboard" => return self.export_dashboard_snapshot(session_id).await,
             "replay" => return self.export_session_replay(session_id).await,
+            "replay-report" => return self.export_replay_report(session_id, None).await,
             "deliberation" => format!("conversation:{session_id}:deliberation"),
             "consolidation" => format!("memory:{session_id}:consolidation"),
             "self-evolution" => format!("memory:{session_id}:self-evolution"),

@@ -304,6 +304,51 @@
   font-size: 0.85rem;
 }
 
+.section-title {
+  font-size: 0.82rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.business-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 1fr;
+}
+
+.business-card {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(9, 17, 38, 0.8);
+  padding: 10px;
+}
+
+.business-card h4 {
+  margin: 0 0 8px;
+  font-size: 0.92rem;
+}
+
+.business-card ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+
+.business-card li {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 1fr 1fr;
+  gap: 8px;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.business-card li strong {
+  color: var(--ink);
+}
+
 @keyframes edgeFlow {
   from {
     stroke-dashoffset: 0;

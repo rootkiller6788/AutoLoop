@@ -9,6 +9,7 @@ import DetailTabs from "./DetailTabs.vue";
 import NodeDetailTab from "./NodeDetailTab.vue";
 import EvolutionTimelineTab from "./EvolutionTimelineTab.vue";
 import GovernanceParamsTab from "./GovernanceParamsTab.vue";
+import BusinessOpsPanel from "./BusinessOpsPanel.vue";
 
 defineProps<{
   snapshot: DashboardSessionSnapshot;
@@ -59,6 +60,10 @@ const emit = defineEmits<{
         :capability-lifecycle="capabilityLifecycle"
         :pending-tool="pendingTool"
         @govern="emit('govern', $event[0], $event[1])"
+      />
+      <BusinessOpsPanel
+        :work-orders="snapshot.workOrders ?? []"
+        :revenue-events="snapshot.revenueEvents ?? []"
       />
     </PanelFrame>
   </aside>

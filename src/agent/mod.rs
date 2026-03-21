@@ -3,9 +3,14 @@ use autoloop_spacetimedb_adapter::SpacetimeDb;
 
 use crate::{
     config::AgentConfig,
+    contracts::{
+        ids::{CapabilityId, SessionId, TaskId, TraceId},
+        types::{ConstraintSet, ExecutionIdentity, TaskEnvelope},
+    },
     hooks::HookRegistry,
     memory::MemorySubsystem,
     providers::{ChatMessage, ProviderRegistry},
+    runtime::RuntimeKernel,
     security::SecurityPolicy,
     session::SessionStore,
     tools::ToolRegistry,
@@ -20,6 +25,7 @@ pub struct AgentRuntime {
     memory: MemorySubsystem,
     hooks: HookRegistry,
     security: SecurityPolicy,
+    runtime: RuntimeKernel,
     spacetimedb: SpacetimeDb,
 }
 
@@ -32,6 +38,7 @@ impl AgentRuntime {
         memory: MemorySubsystem,
         hooks: HookRegistry,
         security: SecurityPolicy,
+        runtime: RuntimeKernel,
         spacetimedb: SpacetimeDb,
     ) -> Self {
         Self {
@@ -42,6 +49,7 @@ impl AgentRuntime {
             memory,
             hooks,
             security,
+            runtime,
             spacetimedb,
         }
     }
@@ -142,6 +150,7 @@ impl AgentRuntime {
             content: system_prompt,
         });
         messages.extend(history);
+        let execution_identity = self.execution_identity_for_session(session_id).await?;
 
         let mut iteration = 0usize;
         loop {
@@ -154,10 +163,36 @@ impl AgentRuntime {
                 return Ok(stopped);
             }
 
+            let provider_envelope = TaskEnvelope {
+                session_id: SessionId::from(session_id),
+                trace_id: TraceId::from(format!(
+                    "{}:provider-loop:{}",
+                    session_id,
+                    current_time_ms()
+                )),
+                task_id: TaskId::from("agent-provider-loop"),
+                capability_id: CapabilityId::from("provider:default"),
+                identity: execution_identity.clone(),
+                payload: serde_json::to_value(&messages).unwrap_or_else(|_| serde_json::json!([])),
+                constraints: self.default_provider_constraints(),
+            };
             let response = self
-                .providers
-                .chat_with_policy(&messages, prompt_overlay.preferred_model.as_deref())
-                .await?;
+                .runtime
+                .execute(
+                    &self.spacetimedb,
+                    &self.tools,
+                    &self.providers,
+                    session_id,
+                    &provider_envelope,
+                    None,
+                    prompt_overlay.preferred_model.as_deref(),
+                )
+                .await?
+                .provider_response
+                .unwrap_or(crate::providers::LlmResponse {
+                    content: None,
+                    tool_calls: Vec::new(),
+                });
             if response.tool_calls.is_empty() {
                 let final_text = response
                     .content
@@ -175,8 +210,10 @@ impl AgentRuntime {
                     .await;
                 let _ = self
                     .hooks
-                    .schedule_learning_tasks(
+                    .run_governed_learning_pipeline(
                         &self.spacetimedb,
+                        &self.memory,
+                        &self.security,
                         session_id,
                         session_id,
                         content,
@@ -215,15 +252,96 @@ impl AgentRuntime {
                     return Ok(blocked_message);
                 }
 
-                let result = self.tools.execute(&call.name, &call.arguments).await?;
+                let manifest = self
+                    .tools
+                    .manifests()
+                    .into_iter()
+                    .find(|manifest| manifest.registered_tool_name == call.name);
+                let envelope = TaskEnvelope {
+                    session_id: SessionId::from(session_id),
+                    trace_id: TraceId::from(format!(
+                        "{}:{}:{}",
+                        session_id,
+                        call.name,
+                        current_time_ms()
+                    )),
+                    task_id: TaskId::from(format!("agent-tool-{}", current_time_ms())),
+                    capability_id: CapabilityId::from(call.name.as_str()),
+                    identity: execution_identity.clone(),
+                    payload: serde_json::Value::String(call.arguments.clone()),
+                    constraints: self.default_constraints(),
+                };
+                let executed = self
+                    .runtime
+                    .execute(
+                        &self.spacetimedb,
+                        &self.tools,
+                        &self.providers,
+                        session_id,
+                        &envelope,
+                        manifest.as_ref(),
+                        None,
+                    )
+                    .await?;
                 self.sessions
-                    .append_tool_message(session_id, &result.name, &result.content)
+                    .append_tool_message(session_id, &call.name, &executed.content)
                     .await;
                 messages.push(ChatMessage {
                     role: "tool".into(),
-                    content: result.content,
+                    content: executed.content,
                 });
             }
         }
     }
+}
+
+impl AgentRuntime {
+    async fn execution_identity_for_session(&self, session_id: &str) -> Result<ExecutionIdentity> {
+        let identity = self
+            .sessions
+            .identity(session_id)
+            .await
+            .ok_or_else(|| anyhow::anyhow!("missing session identity for {session_id}"))?;
+        Ok(ExecutionIdentity {
+            tenant_id: identity.tenant_id,
+            principal_id: identity.principal_id,
+            policy_id: identity.policy_id,
+            lease_token: identity.lease_token,
+        })
+    }
+
+    fn default_constraints(&self) -> ConstraintSet {
+        ConstraintSet {
+            max_cpu_percent: 80,
+            max_memory_mb: 512,
+            timeout_ms: 120_000,
+            max_retries: 2,
+            max_tokens: 16_000,
+            io_allow_paths: vec![".".into()],
+            io_deny_paths: vec!["/etc".into(), "/root".into()],
+            sandbox_profile: "standard".into(),
+            requires_human_approval: false,
+        }
+    }
+
+    fn default_provider_constraints(&self) -> ConstraintSet {
+        ConstraintSet {
+            max_cpu_percent: 80,
+            max_memory_mb: 512,
+            timeout_ms: 120_000,
+            max_retries: 1,
+            max_tokens: 8_000,
+            io_allow_paths: vec![".".into()],
+            io_deny_paths: vec!["/etc".into(), "/root".into()],
+            sandbox_profile: "provider".into(),
+            requires_human_approval: false,
+        }
+    }
+}
+
+fn current_time_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_millis() as u64)
+        .unwrap_or(0)
 }

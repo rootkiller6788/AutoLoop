@@ -16,6 +16,9 @@ tool_breaker_failure_threshold = 3
 tool_breaker_cooldown_ms = 180000
 mcp_breaker_failure_threshold = 2
 mcp_breaker_cooldown_ms = 300000
+gate_mode = "shadow"
+gate_enforce_ratio = 0.2
+rollback_contract_version = "v1"
 
 [security]
 profile = "minimal-ironclaw"

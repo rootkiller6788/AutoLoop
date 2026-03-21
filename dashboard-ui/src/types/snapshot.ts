@@ -16,6 +16,33 @@ export interface DashboardVerifierLens {
   failingTools: string[];
 }
 
+export interface DashboardBusinessLens {
+  revenueMicros: number;
+  costMicros: number;
+  profitMicros: number;
+  marginRatio: number;
+  slaSuccessRatio: number;
+  breachedOrders: number;
+  riskSummary: string;
+}
+
+export interface WorkOrderView {
+  workOrderId: string;
+  taskId: string;
+  taskRole: string;
+  status: string;
+  serviceTier: string;
+}
+
+export interface RevenueEventView {
+  revenueEventId: string;
+  taskId: string;
+  revenueMicros: number;
+  costMicros: number;
+  profitMicros: number;
+  source: string;
+}
+
 export interface DashboardSessionSnapshot {
   sessionId: string;
   anchor: string;
@@ -28,6 +55,9 @@ export interface DashboardSessionSnapshot {
   researchHealth: Record<string, unknown>;
   graph: DashboardGraphLens;
   verifier: DashboardVerifierLens;
+  business: DashboardBusinessLens;
+  workOrders: WorkOrderView[];
+  revenueEvents: RevenueEventView[];
   operationsNotes: string[];
   capabilityLifecycle?: Record<string, unknown>;
   runtimeCircuits?: Record<string, unknown>;

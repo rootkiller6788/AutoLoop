@@ -1,27 +1,27 @@
 # AutoLoop Architecture
 
-This document is a concise map of the current system.
+This document is a concise map of the current system using neutral engineering terms.
 
 ## Runtime Flow
 
-1. CLI receives intent (`main.rs`).
+1. CLI receives intent (`src/main.rs`).
 2. `AutoLoopApp` assembles runtime subsystems (`src/lib.rs`).
-3. Orchestration drives requirement -> CEO -> swarm -> execution (`src/orchestration/mod.rs`).
-4. Runtime guard/verifier enforce bounded execution (`src/runtime/mod.rs`).
-5. Knowledge and learning artifacts are persisted through SpacetimeDB adapter.
+3. Orchestration runs intent clarification -> strategy planning -> swarm execution (`src/orchestration/mod.rs`).
+4. Runtime guard and verifier enforce bounded execution (`src/runtime/mod.rs`).
+5. Knowledge and learning artifacts persist through the SpacetimeDB adapter.
 
 ## Core Modules
 
 - `src/orchestration/`
-  - Swarm planning, debate rounds, route selection, validation.
+  - Intent clarification, planning, debate rounds, route selection, validation.
 - `src/runtime/`
-  - Runtime guard, circuit breaker state, evaluation and verifier logic.
+  - Runtime guard, circuit breaker state, evaluation, verifier logic.
 - `src/providers/`
   - OpenAI-compatible HTTP provider abstraction and model routing.
 - `src/tools/`
-  - Tool registry, forged MCP capability governance.
+  - Tool registry and forged capability catalog.
 - `src/research/`
-  - Research execution backends and anchor-driven data acquisition.
+  - Anchor-driven research execution backends and data acquisition.
 - `src/rag/`
   - GraphRAG snapshot/update/retrieval and graph signals.
 - `src/memory/`
@@ -29,22 +29,22 @@ This document is a concise map of the current system.
 - `src/observability/`
   - Route analytics, failure forensics, dashboard artifacts.
 - `src/dashboard_server.rs`
-  - Minimal HTTP + SSE backend for dashboard snapshots/replay/governance.
+  - Minimal HTTP + SSE backend for snapshot/replay/governance UX.
 
 ## Data and Storage
 
-- Primary runtime record layer: SpacetimeDB adapter (`autoloop-spacetimedb-adapter`).
-- SpacetimeDB module crate: `spacetimedb/`.
-- Runtime dashboard/replay artifacts: `deploy/runtime/` (local operational outputs).
+- Primary runtime record layer: `autoloop-spacetimedb-adapter/`
+- SpacetimeDB module crate: `spacetimedb/`
+- Local runtime artifacts: `deploy/runtime/`
 
-## Frontend Control Plane
+## Frontend Control Surface
 
 - Location: `dashboard-ui/`
 - Stack: Vue 3 + TypeScript + Vite
 - Features:
-  - Capability governance actions
+  - Capability operations
   - Session replay
-  - Graph canvas overlays
+  - Graph overlays
   - SSE event updates
   - Operator settings (language/vendor/base URL/model/API key)
 
@@ -56,4 +56,3 @@ This document is a concise map of the current system.
 - One-command startup scripts:
   - `deploy/scripts/start-autoloop.ps1`
   - `deploy/scripts/start-autoloop.sh`
-

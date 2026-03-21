@@ -1,80 +1,8 @@
-use std::{collections::HashMap, sync::Arc};
+pub mod audit;
+pub mod machine;
+pub mod signal;
+pub mod state;
+pub mod store;
+pub mod transition;
 
-use tokio::sync::RwLock;
-
-use crate::providers::ChatMessage;
-
-#[derive(Debug, Clone)]
-pub struct Session {
-    pub key: String,
-    pub history: Vec<ChatMessage>,
-}
-
-impl Session {
-    pub fn new(key: impl Into<String>) -> Self {
-        Self {
-            key: key.into(),
-            history: Vec::new(),
-        }
-    }
-
-    pub fn push(&mut self, role: impl Into<String>, content: impl Into<String>) {
-        self.history.push(ChatMessage {
-            role: role.into(),
-            content: content.into(),
-        });
-    }
-
-    pub fn recent_history(&self, max_messages: usize) -> Vec<ChatMessage> {
-        let start = self.history.len().saturating_sub(max_messages);
-        self.history[start..].to_vec()
-    }
-}
-
-#[derive(Clone)]
-pub struct SessionStore {
-    inner: Arc<RwLock<HashMap<String, Session>>>,
-    memory_window: usize,
-}
-
-impl SessionStore {
-    pub fn new(memory_window: usize) -> Self {
-        Self {
-            inner: Arc::new(RwLock::new(HashMap::new())),
-            memory_window,
-        }
-    }
-
-    pub async fn append_user_message(&self, session_id: &str, content: &str) {
-        let mut sessions = self.inner.write().await;
-        let session = sessions
-            .entry(session_id.to_string())
-            .or_insert_with(|| Session::new(session_id));
-        session.push("user", content);
-    }
-
-    pub async fn append_assistant_message(&self, session_id: &str, content: &str) {
-        let mut sessions = self.inner.write().await;
-        let session = sessions
-            .entry(session_id.to_string())
-            .or_insert_with(|| Session::new(session_id));
-        session.push("assistant", content);
-    }
-
-    pub async fn append_tool_message(&self, session_id: &str, tool_name: &str, content: &str) {
-        let mut sessions = self.inner.write().await;
-        let session = sessions
-            .entry(session_id.to_string())
-            .or_insert_with(|| Session::new(session_id));
-        session.push("tool", format!("{tool_name}: {content}"));
-    }
-
-    pub async fn history(&self, session_id: &str) -> Vec<ChatMessage> {
-        let sessions = self.inner.read().await;
-        sessions
-            .get(session_id)
-            .map(|session| session.recent_history(self.memory_window))
-            .unwrap_or_default()
-    }
-}
-
+pub use store::{Session, SessionIdentity, SessionStore};

@@ -14,6 +14,38 @@ pub struct AppSection {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RuntimeGateMode {
+    Shadow,
+    Canary,
+    Full,
+}
+
+fn default_runtime_gate_mode() -> RuntimeGateMode {
+    RuntimeGateMode::Shadow
+}
+
+fn default_runtime_gate_enforce_ratio() -> f32 {
+    0.2
+}
+
+fn default_runtime_budget_enforced() -> bool {
+    true
+}
+
+fn default_runtime_default_budget_micros() -> u64 {
+    5_000_000
+}
+
+fn default_runtime_quota_window_ms() -> u64 {
+    3_600_000
+}
+
+fn default_runtime_quota_window_budget_micros() -> u64 {
+    1_000_000
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RuntimeConfig {
     pub max_parallel_agents: usize,
     pub max_memory_mb: u32,
@@ -23,6 +55,20 @@ pub struct RuntimeConfig {
     pub tool_breaker_cooldown_ms: u64,
     pub mcp_breaker_failure_threshold: u32,
     pub mcp_breaker_cooldown_ms: u64,
+    #[serde(default = "default_runtime_gate_mode")]
+    pub gate_mode: RuntimeGateMode,
+    #[serde(default = "default_runtime_gate_enforce_ratio")]
+    pub gate_enforce_ratio: f32,
+    #[serde(default)]
+    pub rollback_contract_version: Option<String>,
+    #[serde(default = "default_runtime_budget_enforced")]
+    pub budget_enforced: bool,
+    #[serde(default = "default_runtime_default_budget_micros")]
+    pub default_budget_micros: u64,
+    #[serde(default = "default_runtime_quota_window_ms")]
+    pub quota_window_ms: u64,
+    #[serde(default = "default_runtime_quota_window_budget_micros")]
+    pub quota_window_budget_micros: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -213,6 +259,13 @@ impl Default for AppConfig {
                 tool_breaker_cooldown_ms: 180_000,
                 mcp_breaker_failure_threshold: 2,
                 mcp_breaker_cooldown_ms: 300_000,
+                gate_mode: RuntimeGateMode::Shadow,
+                gate_enforce_ratio: 0.2,
+                rollback_contract_version: None,
+                budget_enforced: true,
+                default_budget_micros: 5_000_000,
+                quota_window_ms: 3_600_000,
+                quota_window_budget_micros: 1_000_000,
             },
             security: SecurityConfig {
                 profile: "minimal-ironclaw".into(),

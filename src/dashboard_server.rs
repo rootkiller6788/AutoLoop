@@ -175,6 +175,25 @@ async fn route_request(app: &AutoLoopApp, target: &str) -> Result<String> {
         ));
     }
 
+    if let Some(session) = path.strip_prefix("/api/business/") {
+        let body = read_runtime_artifact("dashboard", session)
+            .unwrap_or(app.export_dashboard_snapshot(session).await?);
+        let value = serde_json::from_str::<serde_json::Value>(&body)?;
+        let payload = serde_json::json!({
+            "session_id": session,
+            "business": value.get("business").cloned().unwrap_or_else(|| serde_json::json!({})),
+            "work_orders": value.get("workOrders")
+                .cloned()
+                .or_else(|| value.get("work_orders").cloned())
+                .unwrap_or_else(|| serde_json::json!([])),
+            "revenue_events": value.get("revenueEvents")
+                .cloned()
+                .or_else(|| value.get("revenue_events").cloned())
+                .unwrap_or_else(|| serde_json::json!([])),
+        });
+        return Ok(build_json_response(200, serde_json::to_string_pretty(&payload)?));
+    }
+
     if path == "/api/operator/settings" {
         let settings = read_operator_settings().unwrap_or_default();
         return Ok(build_json_response(

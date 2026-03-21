@@ -74,6 +74,21 @@ pub struct ProviderRouteDecision {
     pub cache_hit: bool,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProviderChatTrace {
+    pub response: LlmResponse,
+    pub route: ProviderRouteDecision,
+    pub cache_key: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProviderProvenance {
+    pub provider_name: String,
+    pub source: String,
+    pub version_ref: String,
+    pub trusted: bool,
+}
+
 #[async_trait]
 pub trait Provider: Send + Sync {
     fn name(&self) -> &str;
@@ -272,6 +287,7 @@ impl Provider for McpProviderAdapter {
 #[derive(Clone)]
 pub struct ProviderRegistry {
     providers: HashMap<String, Arc<dyn Provider>>,
+    provider_provenance: HashMap<String, ProviderProvenance>,
     default_provider: String,
     pub default_model: String,
     screening_model: String,
@@ -285,25 +301,62 @@ pub struct ProviderRegistry {
 impl ProviderRegistry {
     pub fn from_config(config: &ProviderConfig) -> Self {
         let mut providers: HashMap<String, Arc<dyn Provider>> = HashMap::new();
+        let mut provider_provenance: HashMap<String, ProviderProvenance> = HashMap::new();
 
         for name in &config.builtin {
             if name == "openai-compatible" {
                 match OpenAiCompatibleProvider::try_new(config) {
                     Ok(provider) => {
                         providers.insert(name.clone(), Arc::new(provider));
+                        provider_provenance.insert(
+                            name.clone(),
+                            ProviderProvenance {
+                                provider_name: name.clone(),
+                                source: config.api_base_url.clone(),
+                                version_ref: "openai-compatible-http".into(),
+                                trusted: config.api_base_url.starts_with("https://"),
+                            },
+                        );
                     }
                     Err(_) => {
                         providers.insert(name.clone(), Arc::new(StubProvider::new(name.clone())));
+                        provider_provenance.insert(
+                            name.clone(),
+                            ProviderProvenance {
+                                provider_name: name.clone(),
+                                source: "stub-fallback".into(),
+                                version_ref: "stub".into(),
+                                trusted: true,
+                            },
+                        );
                     }
                 }
             } else {
                 providers.insert(name.clone(), Arc::new(StubProvider::new(name.clone())));
+                provider_provenance.insert(
+                    name.clone(),
+                    ProviderProvenance {
+                        provider_name: name.clone(),
+                        source: "builtin".into(),
+                        version_ref: "stub".into(),
+                        trusted: true,
+                    },
+                );
             }
         }
 
         for server in &config.mcp_servers {
             let provider = Arc::new(McpProviderAdapter::new(server.clone()));
             providers.insert(provider.name().to_string(), provider);
+            provider_provenance.insert(
+                format!("mcp:{server}"),
+                ProviderProvenance {
+                    provider_name: format!("mcp:{server}"),
+                    source: format!("mcp://{server}"),
+                    version_ref: "adapter-v1".into(),
+                    trusted: true,
+                },
+            );
         }
 
         let default_provider = config
@@ -315,6 +368,7 @@ impl ProviderRegistry {
 
         Self {
             providers,
+            provider_provenance,
             default_provider,
             default_model: config.default_model.clone(),
             screening_model: config.screening_model.clone(),
@@ -339,6 +393,14 @@ impl ProviderRegistry {
         if !self.providers.contains_key(&self.default_provider) {
             bail!("default provider '{}' is not registered", self.default_provider);
         }
+        if let Some(default_meta) = self.provider_provenance.get(&self.default_provider) {
+            if !default_meta.trusted {
+                bail!(
+                    "default provider '{}' is not trusted by provenance policy",
+                    self.default_provider
+                );
+            }
+        }
         Ok(())
     }
 
@@ -354,6 +416,10 @@ impl ProviderRegistry {
         self.providers.get(name).cloned()
     }
 
+    pub fn provenance(&self, name: &str) -> Option<&ProviderProvenance> {
+        self.provider_provenance.get(name)
+    }
+
     pub async fn chat(&self, messages: &[ChatMessage]) -> Result<LlmResponse> {
         self.chat_with_policy(messages, None).await
     }
@@ -363,18 +429,39 @@ impl ProviderRegistry {
         messages: &[ChatMessage],
         preferred_model: Option<&str>,
     ) -> Result<LlmResponse> {
+        Ok(self
+            .chat_with_trace(messages, preferred_model)
+            .await?
+            .response)
+    }
+
+    pub async fn chat_with_trace(
+        &self,
+        messages: &[ChatMessage],
+        preferred_model: Option<&str>,
+    ) -> Result<ProviderChatTrace> {
         let normalized_messages = normalize_messages(messages);
-        let route = self.route_for_messages(&normalized_messages, preferred_model);
+        let mut route = self.route_for_messages(&normalized_messages, preferred_model);
         let cache_key = self.cache_key(&normalized_messages, &route.model);
         if let Some(cached) = self.prompt_cache.read().get(&cache_key).cloned() {
-            return Ok(cached);
+            route.cache_hit = true;
+            return Ok(ProviderChatTrace {
+                response: cached,
+                route,
+                cache_key,
+            });
         }
         let provider = self
             .get(&self.default_provider)
             .ok_or_else(|| anyhow::anyhow!("provider '{}' not found", self.default_provider))?;
         let response = provider.chat(&normalized_messages, &route.model).await?;
-        self.insert_cache(cache_key, response.clone());
-        Ok(response)
+        self.insert_cache(cache_key.clone(), response.clone());
+        route.cache_hit = false;
+        Ok(ProviderChatTrace {
+            response,
+            route,
+            cache_key,
+        })
     }
 
     pub fn derive_prompt_policy(

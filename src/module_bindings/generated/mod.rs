@@ -8,63 +8,143 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
 pub mod agent_state_table;
 pub mod agent_state_type;
+pub mod append_learning_delta_record_reducer;
+pub mod append_plan_record_reducer;
+pub mod append_policy_decision_record_reducer;
+pub mod append_report_record_reducer;
+pub mod append_runtime_block_record_reducer;
+pub mod append_spend_ledger_record_reducer;
+pub mod append_state_transition_record_reducer;
+pub mod append_task_run_record_reducer;
+pub mod append_verifier_verdict_record_reducer;
 pub mod append_witness_log_record_reducer;
+pub mod budget_account_record_table;
+pub mod budget_account_record_type;
 pub mod causal_edge_record_table;
 pub mod causal_edge_record_type;
+pub mod cost_attribution_record_table;
+pub mod cost_attribution_record_type;
 pub mod create_schedule_event_reducer;
 pub mod grant_permissions_reducer;
 pub mod knowledge_record_table;
 pub mod knowledge_record_type;
+pub mod learning_delta_record_table;
+pub mod learning_delta_record_type;
 pub mod learning_event_kind_type;
 pub mod learning_session_record_table;
 pub mod learning_session_record_type;
 pub mod permission_action_type;
 pub mod permission_grant_table;
 pub mod permission_grant_type;
+pub mod plan_record_table;
+pub mod plan_record_type;
+pub mod policy_decision_record_table;
+pub mod policy_decision_record_type;
+pub mod quota_window_record_table;
+pub mod quota_window_record_type;
 pub mod reflexion_episode_table;
 pub mod reflexion_episode_type;
+pub mod report_record_table;
+pub mod report_record_type;
+pub mod runtime_block_record_table;
+pub mod runtime_block_record_type;
 pub mod schedule_event_table;
 pub mod schedule_event_type;
+pub mod session_record_table;
+pub mod session_record_type;
 pub mod skill_library_record_table;
 pub mod skill_library_record_type;
+pub mod spend_ledger_kind_type;
+pub mod spend_ledger_record_table;
+pub mod spend_ledger_record_type;
+pub mod state_transition_record_table;
+pub mod state_transition_record_type;
+pub mod task_run_record_table;
+pub mod task_run_record_type;
 pub mod update_schedule_status_reducer;
 pub mod upsert_agent_state_reducer;
+pub mod upsert_budget_account_record_reducer;
 pub mod upsert_causal_edge_record_reducer;
+pub mod upsert_cost_attribution_record_reducer;
 pub mod upsert_knowledge_reducer;
 pub mod upsert_learning_session_record_reducer;
+pub mod upsert_quota_window_record_reducer;
 pub mod upsert_reflexion_episode_reducer;
+pub mod upsert_session_record_reducer;
 pub mod upsert_skill_library_record_reducer;
+pub mod verifier_verdict_record_table;
+pub mod verifier_verdict_record_type;
 pub mod witness_log_record_table;
 pub mod witness_log_record_type;
 
 pub use agent_state_table::*;
 pub use agent_state_type::AgentState;
+pub use append_learning_delta_record_reducer::append_learning_delta_record;
+pub use append_plan_record_reducer::append_plan_record;
+pub use append_policy_decision_record_reducer::append_policy_decision_record;
+pub use append_report_record_reducer::append_report_record;
+pub use append_runtime_block_record_reducer::append_runtime_block_record;
+pub use append_spend_ledger_record_reducer::append_spend_ledger_record;
+pub use append_state_transition_record_reducer::append_state_transition_record;
+pub use append_task_run_record_reducer::append_task_run_record;
+pub use append_verifier_verdict_record_reducer::append_verifier_verdict_record;
 pub use append_witness_log_record_reducer::append_witness_log_record;
+pub use budget_account_record_table::*;
+pub use budget_account_record_type::BudgetAccountRecord;
 pub use causal_edge_record_table::*;
 pub use causal_edge_record_type::CausalEdgeRecord;
+pub use cost_attribution_record_table::*;
+pub use cost_attribution_record_type::CostAttributionRecord;
 pub use create_schedule_event_reducer::create_schedule_event;
 pub use grant_permissions_reducer::grant_permissions;
 pub use knowledge_record_table::*;
 pub use knowledge_record_type::KnowledgeRecord;
+pub use learning_delta_record_table::*;
+pub use learning_delta_record_type::LearningDeltaRecord;
 pub use learning_event_kind_type::LearningEventKind;
 pub use learning_session_record_table::*;
 pub use learning_session_record_type::LearningSessionRecord;
 pub use permission_action_type::PermissionAction;
 pub use permission_grant_table::*;
 pub use permission_grant_type::PermissionGrant;
+pub use plan_record_table::*;
+pub use plan_record_type::PlanRecord;
+pub use policy_decision_record_table::*;
+pub use policy_decision_record_type::PolicyDecisionRecord;
+pub use quota_window_record_table::*;
+pub use quota_window_record_type::QuotaWindowRecord;
 pub use reflexion_episode_table::*;
 pub use reflexion_episode_type::ReflexionEpisode;
+pub use report_record_table::*;
+pub use report_record_type::ReportRecord;
+pub use runtime_block_record_table::*;
+pub use runtime_block_record_type::RuntimeBlockRecord;
 pub use schedule_event_table::*;
 pub use schedule_event_type::ScheduleEvent;
+pub use session_record_table::*;
+pub use session_record_type::SessionRecord;
 pub use skill_library_record_table::*;
 pub use skill_library_record_type::SkillLibraryRecord;
+pub use spend_ledger_kind_type::SpendLedgerKind;
+pub use spend_ledger_record_table::*;
+pub use spend_ledger_record_type::SpendLedgerRecord;
+pub use state_transition_record_table::*;
+pub use state_transition_record_type::StateTransitionRecord;
+pub use task_run_record_table::*;
+pub use task_run_record_type::TaskRunRecord;
 pub use update_schedule_status_reducer::update_schedule_status;
 pub use upsert_agent_state_reducer::upsert_agent_state;
+pub use upsert_budget_account_record_reducer::upsert_budget_account_record;
 pub use upsert_causal_edge_record_reducer::upsert_causal_edge_record;
+pub use upsert_cost_attribution_record_reducer::upsert_cost_attribution_record;
 pub use upsert_knowledge_reducer::upsert_knowledge;
 pub use upsert_learning_session_record_reducer::upsert_learning_session_record;
+pub use upsert_quota_window_record_reducer::upsert_quota_window_record;
 pub use upsert_reflexion_episode_reducer::upsert_reflexion_episode;
+pub use upsert_session_record_reducer::upsert_session_record;
 pub use upsert_skill_library_record_reducer::upsert_skill_library_record;
+pub use verifier_verdict_record_table::*;
+pub use verifier_verdict_record_type::VerifierVerdictRecord;
 pub use witness_log_record_table::*;
 pub use witness_log_record_type::WitnessLogRecord;
 
@@ -76,6 +156,91 @@ pub use witness_log_record_type::WitnessLogRecord;
 /// to indicate which reducer caused the event.
 
 pub enum Reducer {
+    AppendLearningDeltaRecord {
+        id: String,
+        session_id: String,
+        trace_id: String,
+        delta_json: String,
+        created_at_ms: u64,
+    },
+    AppendPlanRecord {
+        id: String,
+        session_id: String,
+        trace_id: String,
+        objective: String,
+        payload: String,
+        created_at_ms: u64,
+    },
+    AppendPolicyDecisionRecord {
+        id: String,
+        session_id: String,
+        trace_id: String,
+        decision: String,
+        reason: String,
+        created_at_ms: u64,
+    },
+    AppendReportRecord {
+        id: String,
+        session_id: String,
+        trace_id: String,
+        report_type: String,
+        payload: String,
+        created_at_ms: u64,
+    },
+    AppendRuntimeBlockRecord {
+        id: String,
+        session_id: String,
+        trace_id: String,
+        task_id: String,
+        capability_id: String,
+        reason: String,
+        created_at_ms: u64,
+    },
+    AppendSpendLedgerRecord {
+        id: String,
+        tenant_id: String,
+        account_key: String,
+        session_id: String,
+        trace_id: String,
+        task_id: String,
+        capability_id: String,
+        kind: SpendLedgerKind,
+        amount_micros: i64,
+        token_cost_micros: u64,
+        tool_cost_micros: u64,
+        duration_cost_micros: u64,
+        reason: String,
+        created_at_ms: u64,
+    },
+    AppendStateTransitionRecord {
+        id: String,
+        session_id: String,
+        trace_id: String,
+        from_state: String,
+        signal: String,
+        to_state: String,
+        reason: String,
+        created_at_ms: u64,
+    },
+    AppendTaskRunRecord {
+        id: String,
+        session_id: String,
+        trace_id: String,
+        task_id: String,
+        capability_id: String,
+        status: String,
+        output: String,
+        created_at_ms: u64,
+    },
+    AppendVerifierVerdictRecord {
+        id: String,
+        session_id: String,
+        trace_id: String,
+        verdict: String,
+        score: f32,
+        summary: String,
+        created_at_ms: u64,
+    },
     AppendWitnessLogRecord {
         id: String,
         session_id: String,
@@ -108,6 +273,17 @@ pub enum Reducer {
         last_user_message: String,
         last_assistant_message: Option<String>,
     },
+    UpsertBudgetAccountRecord {
+        account_key: String,
+        tenant_id: String,
+        principal_id: String,
+        policy_id: String,
+        total_budget_micros: u64,
+        reserved_micros: u64,
+        spent_micros: u64,
+        blocked_count: u64,
+        updated_at_ms: u64,
+    },
     UpsertCausalEdgeRecord {
         id: String,
         session_id: String,
@@ -117,6 +293,24 @@ pub enum Reducer {
         strength: f32,
         confidence: f32,
         created_at_ms: u64,
+    },
+    UpsertCostAttributionRecord {
+        id: String,
+        tenant_id: String,
+        principal_id: String,
+        policy_id: String,
+        session_id: String,
+        trace_id: String,
+        task_id: String,
+        capability_id: String,
+        provider_tokens: u32,
+        tool_invocations: u32,
+        duration_ms: u64,
+        token_cost_micros: u64,
+        tool_cost_micros: u64,
+        duration_cost_micros: u64,
+        total_cost_micros: u64,
+        settled_at_ms: u64,
     },
     UpsertKnowledge {
         key: String,
@@ -133,6 +327,17 @@ pub enum Reducer {
         started_at_ms: u64,
         completed_at_ms: Option<u64>,
     },
+    UpsertQuotaWindowRecord {
+        window_key: String,
+        tenant_id: String,
+        account_key: String,
+        window_start_ms: u64,
+        window_end_ms: u64,
+        window_budget_micros: u64,
+        consumed_micros: u64,
+        blocked_count: u64,
+        updated_at_ms: u64,
+    },
     UpsertReflexionEpisode {
         id: String,
         session_id: String,
@@ -143,6 +348,12 @@ pub enum Reducer {
         status: String,
         score: f32,
         created_at_ms: u64,
+    },
+    UpsertSessionRecord {
+        session_id: String,
+        trace_id: String,
+        status: String,
+        updated_at_ms: u64,
     },
     UpsertSkillLibraryRecord {
         id: String,
@@ -165,15 +376,28 @@ impl __sdk::InModule for Reducer {
 impl __sdk::Reducer for Reducer {
     fn reducer_name(&self) -> &'static str {
         match self {
+            Reducer::AppendLearningDeltaRecord { .. } => "append_learning_delta_record",
+            Reducer::AppendPlanRecord { .. } => "append_plan_record",
+            Reducer::AppendPolicyDecisionRecord { .. } => "append_policy_decision_record",
+            Reducer::AppendReportRecord { .. } => "append_report_record",
+            Reducer::AppendRuntimeBlockRecord { .. } => "append_runtime_block_record",
+            Reducer::AppendSpendLedgerRecord { .. } => "append_spend_ledger_record",
+            Reducer::AppendStateTransitionRecord { .. } => "append_state_transition_record",
+            Reducer::AppendTaskRunRecord { .. } => "append_task_run_record",
+            Reducer::AppendVerifierVerdictRecord { .. } => "append_verifier_verdict_record",
             Reducer::AppendWitnessLogRecord { .. } => "append_witness_log_record",
             Reducer::CreateScheduleEvent { .. } => "create_schedule_event",
             Reducer::GrantPermissions { .. } => "grant_permissions",
             Reducer::UpdateScheduleStatus { .. } => "update_schedule_status",
             Reducer::UpsertAgentState { .. } => "upsert_agent_state",
+            Reducer::UpsertBudgetAccountRecord { .. } => "upsert_budget_account_record",
             Reducer::UpsertCausalEdgeRecord { .. } => "upsert_causal_edge_record",
+            Reducer::UpsertCostAttributionRecord { .. } => "upsert_cost_attribution_record",
             Reducer::UpsertKnowledge { .. } => "upsert_knowledge",
             Reducer::UpsertLearningSessionRecord { .. } => "upsert_learning_session_record",
+            Reducer::UpsertQuotaWindowRecord { .. } => "upsert_quota_window_record",
             Reducer::UpsertReflexionEpisode { .. } => "upsert_reflexion_episode",
+            Reducer::UpsertSessionRecord { .. } => "upsert_session_record",
             Reducer::UpsertSkillLibraryRecord { .. } => "upsert_skill_library_record",
             _ => unreachable!(),
         }
@@ -181,6 +405,179 @@ impl __sdk::Reducer for Reducer {
     #[allow(clippy::clone_on_copy)]
     fn args_bsatn(&self) -> Result<Vec<u8>, __sats::bsatn::EncodeError> {
         match self {
+            Reducer::AppendLearningDeltaRecord {
+                id,
+                session_id,
+                trace_id,
+                delta_json,
+                created_at_ms,
+            } => __sats::bsatn::to_vec(
+                &append_learning_delta_record_reducer::AppendLearningDeltaRecordArgs {
+                    id: id.clone(),
+                    session_id: session_id.clone(),
+                    trace_id: trace_id.clone(),
+                    delta_json: delta_json.clone(),
+                    created_at_ms: created_at_ms.clone(),
+                },
+            ),
+            Reducer::AppendPlanRecord {
+                id,
+                session_id,
+                trace_id,
+                objective,
+                payload,
+                created_at_ms,
+            } => __sats::bsatn::to_vec(&append_plan_record_reducer::AppendPlanRecordArgs {
+                id: id.clone(),
+                session_id: session_id.clone(),
+                trace_id: trace_id.clone(),
+                objective: objective.clone(),
+                payload: payload.clone(),
+                created_at_ms: created_at_ms.clone(),
+            }),
+            Reducer::AppendPolicyDecisionRecord {
+                id,
+                session_id,
+                trace_id,
+                decision,
+                reason,
+                created_at_ms,
+            } => __sats::bsatn::to_vec(
+                &append_policy_decision_record_reducer::AppendPolicyDecisionRecordArgs {
+                    id: id.clone(),
+                    session_id: session_id.clone(),
+                    trace_id: trace_id.clone(),
+                    decision: decision.clone(),
+                    reason: reason.clone(),
+                    created_at_ms: created_at_ms.clone(),
+                },
+            ),
+            Reducer::AppendReportRecord {
+                id,
+                session_id,
+                trace_id,
+                report_type,
+                payload,
+                created_at_ms,
+            } => __sats::bsatn::to_vec(&append_report_record_reducer::AppendReportRecordArgs {
+                id: id.clone(),
+                session_id: session_id.clone(),
+                trace_id: trace_id.clone(),
+                report_type: report_type.clone(),
+                payload: payload.clone(),
+                created_at_ms: created_at_ms.clone(),
+            }),
+            Reducer::AppendRuntimeBlockRecord {
+                id,
+                session_id,
+                trace_id,
+                task_id,
+                capability_id,
+                reason,
+                created_at_ms,
+            } => __sats::bsatn::to_vec(
+                &append_runtime_block_record_reducer::AppendRuntimeBlockRecordArgs {
+                    id: id.clone(),
+                    session_id: session_id.clone(),
+                    trace_id: trace_id.clone(),
+                    task_id: task_id.clone(),
+                    capability_id: capability_id.clone(),
+                    reason: reason.clone(),
+                    created_at_ms: created_at_ms.clone(),
+                },
+            ),
+            Reducer::AppendSpendLedgerRecord {
+                id,
+                tenant_id,
+                account_key,
+                session_id,
+                trace_id,
+                task_id,
+                capability_id,
+                kind,
+                amount_micros,
+                token_cost_micros,
+                tool_cost_micros,
+                duration_cost_micros,
+                reason,
+                created_at_ms,
+            } => __sats::bsatn::to_vec(
+                &append_spend_ledger_record_reducer::AppendSpendLedgerRecordArgs {
+                    id: id.clone(),
+                    tenant_id: tenant_id.clone(),
+                    account_key: account_key.clone(),
+                    session_id: session_id.clone(),
+                    trace_id: trace_id.clone(),
+                    task_id: task_id.clone(),
+                    capability_id: capability_id.clone(),
+                    kind: kind.clone(),
+                    amount_micros: amount_micros.clone(),
+                    token_cost_micros: token_cost_micros.clone(),
+                    tool_cost_micros: tool_cost_micros.clone(),
+                    duration_cost_micros: duration_cost_micros.clone(),
+                    reason: reason.clone(),
+                    created_at_ms: created_at_ms.clone(),
+                },
+            ),
+            Reducer::AppendStateTransitionRecord {
+                id,
+                session_id,
+                trace_id,
+                from_state,
+                signal,
+                to_state,
+                reason,
+                created_at_ms,
+            } => __sats::bsatn::to_vec(
+                &append_state_transition_record_reducer::AppendStateTransitionRecordArgs {
+                    id: id.clone(),
+                    session_id: session_id.clone(),
+                    trace_id: trace_id.clone(),
+                    from_state: from_state.clone(),
+                    signal: signal.clone(),
+                    to_state: to_state.clone(),
+                    reason: reason.clone(),
+                    created_at_ms: created_at_ms.clone(),
+                },
+            ),
+            Reducer::AppendTaskRunRecord {
+                id,
+                session_id,
+                trace_id,
+                task_id,
+                capability_id,
+                status,
+                output,
+                created_at_ms,
+            } => __sats::bsatn::to_vec(&append_task_run_record_reducer::AppendTaskRunRecordArgs {
+                id: id.clone(),
+                session_id: session_id.clone(),
+                trace_id: trace_id.clone(),
+                task_id: task_id.clone(),
+                capability_id: capability_id.clone(),
+                status: status.clone(),
+                output: output.clone(),
+                created_at_ms: created_at_ms.clone(),
+            }),
+            Reducer::AppendVerifierVerdictRecord {
+                id,
+                session_id,
+                trace_id,
+                verdict,
+                score,
+                summary,
+                created_at_ms,
+            } => __sats::bsatn::to_vec(
+                &append_verifier_verdict_record_reducer::AppendVerifierVerdictRecordArgs {
+                    id: id.clone(),
+                    session_id: session_id.clone(),
+                    trace_id: trace_id.clone(),
+                    verdict: verdict.clone(),
+                    score: score.clone(),
+                    summary: summary.clone(),
+                    created_at_ms: created_at_ms.clone(),
+                },
+            ),
             Reducer::AppendWitnessLogRecord {
                 id,
                 session_id,
@@ -241,6 +638,29 @@ impl __sdk::Reducer for Reducer {
                 last_user_message: last_user_message.clone(),
                 last_assistant_message: last_assistant_message.clone(),
             }),
+            Reducer::UpsertBudgetAccountRecord {
+                account_key,
+                tenant_id,
+                principal_id,
+                policy_id,
+                total_budget_micros,
+                reserved_micros,
+                spent_micros,
+                blocked_count,
+                updated_at_ms,
+            } => __sats::bsatn::to_vec(
+                &upsert_budget_account_record_reducer::UpsertBudgetAccountRecordArgs {
+                    account_key: account_key.clone(),
+                    tenant_id: tenant_id.clone(),
+                    principal_id: principal_id.clone(),
+                    policy_id: policy_id.clone(),
+                    total_budget_micros: total_budget_micros.clone(),
+                    reserved_micros: reserved_micros.clone(),
+                    spent_micros: spent_micros.clone(),
+                    blocked_count: blocked_count.clone(),
+                    updated_at_ms: updated_at_ms.clone(),
+                },
+            ),
             Reducer::UpsertCausalEdgeRecord {
                 id,
                 session_id,
@@ -260,6 +680,43 @@ impl __sdk::Reducer for Reducer {
                     strength: strength.clone(),
                     confidence: confidence.clone(),
                     created_at_ms: created_at_ms.clone(),
+                },
+            ),
+            Reducer::UpsertCostAttributionRecord {
+                id,
+                tenant_id,
+                principal_id,
+                policy_id,
+                session_id,
+                trace_id,
+                task_id,
+                capability_id,
+                provider_tokens,
+                tool_invocations,
+                duration_ms,
+                token_cost_micros,
+                tool_cost_micros,
+                duration_cost_micros,
+                total_cost_micros,
+                settled_at_ms,
+            } => __sats::bsatn::to_vec(
+                &upsert_cost_attribution_record_reducer::UpsertCostAttributionRecordArgs {
+                    id: id.clone(),
+                    tenant_id: tenant_id.clone(),
+                    principal_id: principal_id.clone(),
+                    policy_id: policy_id.clone(),
+                    session_id: session_id.clone(),
+                    trace_id: trace_id.clone(),
+                    task_id: task_id.clone(),
+                    capability_id: capability_id.clone(),
+                    provider_tokens: provider_tokens.clone(),
+                    tool_invocations: tool_invocations.clone(),
+                    duration_ms: duration_ms.clone(),
+                    token_cost_micros: token_cost_micros.clone(),
+                    tool_cost_micros: tool_cost_micros.clone(),
+                    duration_cost_micros: duration_cost_micros.clone(),
+                    total_cost_micros: total_cost_micros.clone(),
+                    settled_at_ms: settled_at_ms.clone(),
                 },
             ),
             Reducer::UpsertKnowledge { key, value, source } => {
@@ -290,6 +747,29 @@ impl __sdk::Reducer for Reducer {
                     completed_at_ms: completed_at_ms.clone(),
                 },
             ),
+            Reducer::UpsertQuotaWindowRecord {
+                window_key,
+                tenant_id,
+                account_key,
+                window_start_ms,
+                window_end_ms,
+                window_budget_micros,
+                consumed_micros,
+                blocked_count,
+                updated_at_ms,
+            } => __sats::bsatn::to_vec(
+                &upsert_quota_window_record_reducer::UpsertQuotaWindowRecordArgs {
+                    window_key: window_key.clone(),
+                    tenant_id: tenant_id.clone(),
+                    account_key: account_key.clone(),
+                    window_start_ms: window_start_ms.clone(),
+                    window_end_ms: window_end_ms.clone(),
+                    window_budget_micros: window_budget_micros.clone(),
+                    consumed_micros: consumed_micros.clone(),
+                    blocked_count: blocked_count.clone(),
+                    updated_at_ms: updated_at_ms.clone(),
+                },
+            ),
             Reducer::UpsertReflexionEpisode {
                 id,
                 session_id,
@@ -313,6 +793,17 @@ impl __sdk::Reducer for Reducer {
                     created_at_ms: created_at_ms.clone(),
                 },
             ),
+            Reducer::UpsertSessionRecord {
+                session_id,
+                trace_id,
+                status,
+                updated_at_ms,
+            } => __sats::bsatn::to_vec(&upsert_session_record_reducer::UpsertSessionRecordArgs {
+                session_id: session_id.clone(),
+                trace_id: trace_id.clone(),
+                status: status.clone(),
+                updated_at_ms: updated_at_ms.clone(),
+            }),
             Reducer::UpsertSkillLibraryRecord {
                 id,
                 session_id,
@@ -348,13 +839,26 @@ impl __sdk::Reducer for Reducer {
 #[doc(hidden)]
 pub struct DbUpdate {
     agent_state: __sdk::TableUpdate<AgentState>,
+    budget_account_record: __sdk::TableUpdate<BudgetAccountRecord>,
     causal_edge_record: __sdk::TableUpdate<CausalEdgeRecord>,
+    cost_attribution_record: __sdk::TableUpdate<CostAttributionRecord>,
     knowledge_record: __sdk::TableUpdate<KnowledgeRecord>,
+    learning_delta_record: __sdk::TableUpdate<LearningDeltaRecord>,
     learning_session_record: __sdk::TableUpdate<LearningSessionRecord>,
     permission_grant: __sdk::TableUpdate<PermissionGrant>,
+    plan_record: __sdk::TableUpdate<PlanRecord>,
+    policy_decision_record: __sdk::TableUpdate<PolicyDecisionRecord>,
+    quota_window_record: __sdk::TableUpdate<QuotaWindowRecord>,
     reflexion_episode: __sdk::TableUpdate<ReflexionEpisode>,
+    report_record: __sdk::TableUpdate<ReportRecord>,
+    runtime_block_record: __sdk::TableUpdate<RuntimeBlockRecord>,
     schedule_event: __sdk::TableUpdate<ScheduleEvent>,
+    session_record: __sdk::TableUpdate<SessionRecord>,
     skill_library_record: __sdk::TableUpdate<SkillLibraryRecord>,
+    spend_ledger_record: __sdk::TableUpdate<SpendLedgerRecord>,
+    state_transition_record: __sdk::TableUpdate<StateTransitionRecord>,
+    task_run_record: __sdk::TableUpdate<TaskRunRecord>,
+    verifier_verdict_record: __sdk::TableUpdate<VerifierVerdictRecord>,
     witness_log_record: __sdk::TableUpdate<WitnessLogRecord>,
 }
 
@@ -367,26 +871,65 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "agent_state" => db_update
                     .agent_state
                     .append(agent_state_table::parse_table_update(table_update)?),
+                "budget_account_record" => db_update.budget_account_record.append(
+                    budget_account_record_table::parse_table_update(table_update)?,
+                ),
                 "causal_edge_record" => db_update
                     .causal_edge_record
                     .append(causal_edge_record_table::parse_table_update(table_update)?),
+                "cost_attribution_record" => db_update.cost_attribution_record.append(
+                    cost_attribution_record_table::parse_table_update(table_update)?,
+                ),
                 "knowledge_record" => db_update
                     .knowledge_record
                     .append(knowledge_record_table::parse_table_update(table_update)?),
+                "learning_delta_record" => db_update.learning_delta_record.append(
+                    learning_delta_record_table::parse_table_update(table_update)?,
+                ),
                 "learning_session_record" => db_update.learning_session_record.append(
                     learning_session_record_table::parse_table_update(table_update)?,
                 ),
                 "permission_grant" => db_update
                     .permission_grant
                     .append(permission_grant_table::parse_table_update(table_update)?),
+                "plan_record" => db_update
+                    .plan_record
+                    .append(plan_record_table::parse_table_update(table_update)?),
+                "policy_decision_record" => db_update.policy_decision_record.append(
+                    policy_decision_record_table::parse_table_update(table_update)?,
+                ),
+                "quota_window_record" => db_update
+                    .quota_window_record
+                    .append(quota_window_record_table::parse_table_update(table_update)?),
                 "reflexion_episode" => db_update
                     .reflexion_episode
                     .append(reflexion_episode_table::parse_table_update(table_update)?),
+                "report_record" => db_update
+                    .report_record
+                    .append(report_record_table::parse_table_update(table_update)?),
+                "runtime_block_record" => db_update.runtime_block_record.append(
+                    runtime_block_record_table::parse_table_update(table_update)?,
+                ),
                 "schedule_event" => db_update
                     .schedule_event
                     .append(schedule_event_table::parse_table_update(table_update)?),
+                "session_record" => db_update
+                    .session_record
+                    .append(session_record_table::parse_table_update(table_update)?),
                 "skill_library_record" => db_update.skill_library_record.append(
                     skill_library_record_table::parse_table_update(table_update)?,
+                ),
+                "spend_ledger_record" => db_update
+                    .spend_ledger_record
+                    .append(spend_ledger_record_table::parse_table_update(table_update)?),
+                "state_transition_record" => db_update.state_transition_record.append(
+                    state_transition_record_table::parse_table_update(table_update)?,
+                ),
+                "task_run_record" => db_update
+                    .task_run_record
+                    .append(task_run_record_table::parse_table_update(table_update)?),
+                "verifier_verdict_record" => db_update.verifier_verdict_record.append(
+                    verifier_verdict_record_table::parse_table_update(table_update)?,
                 ),
                 "witness_log_record" => db_update
                     .witness_log_record
@@ -420,12 +963,30 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.agent_state = cache
             .apply_diff_to_table::<AgentState>("agent_state", &self.agent_state)
             .with_updates_by_pk(|row| &row.session_id);
+        diff.budget_account_record = cache
+            .apply_diff_to_table::<BudgetAccountRecord>(
+                "budget_account_record",
+                &self.budget_account_record,
+            )
+            .with_updates_by_pk(|row| &row.account_key);
         diff.causal_edge_record = cache
             .apply_diff_to_table::<CausalEdgeRecord>("causal_edge_record", &self.causal_edge_record)
+            .with_updates_by_pk(|row| &row.id);
+        diff.cost_attribution_record = cache
+            .apply_diff_to_table::<CostAttributionRecord>(
+                "cost_attribution_record",
+                &self.cost_attribution_record,
+            )
             .with_updates_by_pk(|row| &row.id);
         diff.knowledge_record = cache
             .apply_diff_to_table::<KnowledgeRecord>("knowledge_record", &self.knowledge_record)
             .with_updates_by_pk(|row| &row.key);
+        diff.learning_delta_record = cache
+            .apply_diff_to_table::<LearningDeltaRecord>(
+                "learning_delta_record",
+                &self.learning_delta_record,
+            )
+            .with_updates_by_pk(|row| &row.id);
         diff.learning_session_record = cache
             .apply_diff_to_table::<LearningSessionRecord>(
                 "learning_session_record",
@@ -435,16 +996,64 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.permission_grant = cache
             .apply_diff_to_table::<PermissionGrant>("permission_grant", &self.permission_grant)
             .with_updates_by_pk(|row| &row.actor_id);
+        diff.plan_record = cache
+            .apply_diff_to_table::<PlanRecord>("plan_record", &self.plan_record)
+            .with_updates_by_pk(|row| &row.id);
+        diff.policy_decision_record = cache
+            .apply_diff_to_table::<PolicyDecisionRecord>(
+                "policy_decision_record",
+                &self.policy_decision_record,
+            )
+            .with_updates_by_pk(|row| &row.id);
+        diff.quota_window_record = cache
+            .apply_diff_to_table::<QuotaWindowRecord>(
+                "quota_window_record",
+                &self.quota_window_record,
+            )
+            .with_updates_by_pk(|row| &row.window_key);
         diff.reflexion_episode = cache
             .apply_diff_to_table::<ReflexionEpisode>("reflexion_episode", &self.reflexion_episode)
+            .with_updates_by_pk(|row| &row.id);
+        diff.report_record = cache
+            .apply_diff_to_table::<ReportRecord>("report_record", &self.report_record)
+            .with_updates_by_pk(|row| &row.id);
+        diff.runtime_block_record = cache
+            .apply_diff_to_table::<RuntimeBlockRecord>(
+                "runtime_block_record",
+                &self.runtime_block_record,
+            )
             .with_updates_by_pk(|row| &row.id);
         diff.schedule_event = cache
             .apply_diff_to_table::<ScheduleEvent>("schedule_event", &self.schedule_event)
             .with_updates_by_pk(|row| &row.id);
+        diff.session_record = cache
+            .apply_diff_to_table::<SessionRecord>("session_record", &self.session_record)
+            .with_updates_by_pk(|row| &row.session_id);
         diff.skill_library_record = cache
             .apply_diff_to_table::<SkillLibraryRecord>(
                 "skill_library_record",
                 &self.skill_library_record,
+            )
+            .with_updates_by_pk(|row| &row.id);
+        diff.spend_ledger_record = cache
+            .apply_diff_to_table::<SpendLedgerRecord>(
+                "spend_ledger_record",
+                &self.spend_ledger_record,
+            )
+            .with_updates_by_pk(|row| &row.id);
+        diff.state_transition_record = cache
+            .apply_diff_to_table::<StateTransitionRecord>(
+                "state_transition_record",
+                &self.state_transition_record,
+            )
+            .with_updates_by_pk(|row| &row.id);
+        diff.task_run_record = cache
+            .apply_diff_to_table::<TaskRunRecord>("task_run_record", &self.task_run_record)
+            .with_updates_by_pk(|row| &row.id);
+        diff.verifier_verdict_record = cache
+            .apply_diff_to_table::<VerifierVerdictRecord>(
+                "verifier_verdict_record",
+                &self.verifier_verdict_record,
             )
             .with_updates_by_pk(|row| &row.id);
         diff.witness_log_record = cache
@@ -460,11 +1069,20 @@ impl __sdk::DbUpdate for DbUpdate {
                 "agent_state" => db_update
                     .agent_state
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "budget_account_record" => db_update
+                    .budget_account_record
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "causal_edge_record" => db_update
                     .causal_edge_record
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "cost_attribution_record" => db_update
+                    .cost_attribution_record
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "knowledge_record" => db_update
                     .knowledge_record
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "learning_delta_record" => db_update
+                    .learning_delta_record
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "learning_session_record" => db_update
                     .learning_session_record
@@ -472,14 +1090,44 @@ impl __sdk::DbUpdate for DbUpdate {
                 "permission_grant" => db_update
                     .permission_grant
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "plan_record" => db_update
+                    .plan_record
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "policy_decision_record" => db_update
+                    .policy_decision_record
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "quota_window_record" => db_update
+                    .quota_window_record
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "reflexion_episode" => db_update
                     .reflexion_episode
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "report_record" => db_update
+                    .report_record
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "runtime_block_record" => db_update
+                    .runtime_block_record
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "schedule_event" => db_update
                     .schedule_event
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "session_record" => db_update
+                    .session_record
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "skill_library_record" => db_update
                     .skill_library_record
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "spend_ledger_record" => db_update
+                    .spend_ledger_record
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "state_transition_record" => db_update
+                    .state_transition_record
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "task_run_record" => db_update
+                    .task_run_record
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "verifier_verdict_record" => db_update
+                    .verifier_verdict_record
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "witness_log_record" => db_update
                     .witness_log_record
@@ -500,11 +1148,20 @@ impl __sdk::DbUpdate for DbUpdate {
                 "agent_state" => db_update
                     .agent_state
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "budget_account_record" => db_update
+                    .budget_account_record
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "causal_edge_record" => db_update
                     .causal_edge_record
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "cost_attribution_record" => db_update
+                    .cost_attribution_record
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "knowledge_record" => db_update
                     .knowledge_record
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "learning_delta_record" => db_update
+                    .learning_delta_record
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "learning_session_record" => db_update
                     .learning_session_record
@@ -512,14 +1169,44 @@ impl __sdk::DbUpdate for DbUpdate {
                 "permission_grant" => db_update
                     .permission_grant
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "plan_record" => db_update
+                    .plan_record
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "policy_decision_record" => db_update
+                    .policy_decision_record
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "quota_window_record" => db_update
+                    .quota_window_record
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "reflexion_episode" => db_update
                     .reflexion_episode
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "report_record" => db_update
+                    .report_record
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "runtime_block_record" => db_update
+                    .runtime_block_record
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "schedule_event" => db_update
                     .schedule_event
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "session_record" => db_update
+                    .session_record
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "skill_library_record" => db_update
                     .skill_library_record
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "spend_ledger_record" => db_update
+                    .spend_ledger_record
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "state_transition_record" => db_update
+                    .state_transition_record
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "task_run_record" => db_update
+                    .task_run_record
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "verifier_verdict_record" => db_update
+                    .verifier_verdict_record
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "witness_log_record" => db_update
                     .witness_log_record
@@ -540,13 +1227,26 @@ impl __sdk::DbUpdate for DbUpdate {
 #[doc(hidden)]
 pub struct AppliedDiff<'r> {
     agent_state: __sdk::TableAppliedDiff<'r, AgentState>,
+    budget_account_record: __sdk::TableAppliedDiff<'r, BudgetAccountRecord>,
     causal_edge_record: __sdk::TableAppliedDiff<'r, CausalEdgeRecord>,
+    cost_attribution_record: __sdk::TableAppliedDiff<'r, CostAttributionRecord>,
     knowledge_record: __sdk::TableAppliedDiff<'r, KnowledgeRecord>,
+    learning_delta_record: __sdk::TableAppliedDiff<'r, LearningDeltaRecord>,
     learning_session_record: __sdk::TableAppliedDiff<'r, LearningSessionRecord>,
     permission_grant: __sdk::TableAppliedDiff<'r, PermissionGrant>,
+    plan_record: __sdk::TableAppliedDiff<'r, PlanRecord>,
+    policy_decision_record: __sdk::TableAppliedDiff<'r, PolicyDecisionRecord>,
+    quota_window_record: __sdk::TableAppliedDiff<'r, QuotaWindowRecord>,
     reflexion_episode: __sdk::TableAppliedDiff<'r, ReflexionEpisode>,
+    report_record: __sdk::TableAppliedDiff<'r, ReportRecord>,
+    runtime_block_record: __sdk::TableAppliedDiff<'r, RuntimeBlockRecord>,
     schedule_event: __sdk::TableAppliedDiff<'r, ScheduleEvent>,
+    session_record: __sdk::TableAppliedDiff<'r, SessionRecord>,
     skill_library_record: __sdk::TableAppliedDiff<'r, SkillLibraryRecord>,
+    spend_ledger_record: __sdk::TableAppliedDiff<'r, SpendLedgerRecord>,
+    state_transition_record: __sdk::TableAppliedDiff<'r, StateTransitionRecord>,
+    task_run_record: __sdk::TableAppliedDiff<'r, TaskRunRecord>,
+    verifier_verdict_record: __sdk::TableAppliedDiff<'r, VerifierVerdictRecord>,
     witness_log_record: __sdk::TableAppliedDiff<'r, WitnessLogRecord>,
     __unused: std::marker::PhantomData<&'r ()>,
 }
@@ -562,14 +1262,29 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks: &mut __sdk::DbCallbacks<RemoteModule>,
     ) {
         callbacks.invoke_table_row_callbacks::<AgentState>("agent_state", &self.agent_state, event);
+        callbacks.invoke_table_row_callbacks::<BudgetAccountRecord>(
+            "budget_account_record",
+            &self.budget_account_record,
+            event,
+        );
         callbacks.invoke_table_row_callbacks::<CausalEdgeRecord>(
             "causal_edge_record",
             &self.causal_edge_record,
             event,
         );
+        callbacks.invoke_table_row_callbacks::<CostAttributionRecord>(
+            "cost_attribution_record",
+            &self.cost_attribution_record,
+            event,
+        );
         callbacks.invoke_table_row_callbacks::<KnowledgeRecord>(
             "knowledge_record",
             &self.knowledge_record,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<LearningDeltaRecord>(
+            "learning_delta_record",
+            &self.learning_delta_record,
             event,
         );
         callbacks.invoke_table_row_callbacks::<LearningSessionRecord>(
@@ -582,9 +1297,30 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
             &self.permission_grant,
             event,
         );
+        callbacks.invoke_table_row_callbacks::<PlanRecord>("plan_record", &self.plan_record, event);
+        callbacks.invoke_table_row_callbacks::<PolicyDecisionRecord>(
+            "policy_decision_record",
+            &self.policy_decision_record,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<QuotaWindowRecord>(
+            "quota_window_record",
+            &self.quota_window_record,
+            event,
+        );
         callbacks.invoke_table_row_callbacks::<ReflexionEpisode>(
             "reflexion_episode",
             &self.reflexion_episode,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<ReportRecord>(
+            "report_record",
+            &self.report_record,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<RuntimeBlockRecord>(
+            "runtime_block_record",
+            &self.runtime_block_record,
             event,
         );
         callbacks.invoke_table_row_callbacks::<ScheduleEvent>(
@@ -592,9 +1328,34 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
             &self.schedule_event,
             event,
         );
+        callbacks.invoke_table_row_callbacks::<SessionRecord>(
+            "session_record",
+            &self.session_record,
+            event,
+        );
         callbacks.invoke_table_row_callbacks::<SkillLibraryRecord>(
             "skill_library_record",
             &self.skill_library_record,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<SpendLedgerRecord>(
+            "spend_ledger_record",
+            &self.spend_ledger_record,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<StateTransitionRecord>(
+            "state_transition_record",
+            &self.state_transition_record,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<TaskRunRecord>(
+            "task_run_record",
+            &self.task_run_record,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<VerifierVerdictRecord>(
+            "verifier_verdict_record",
+            &self.verifier_verdict_record,
             event,
         );
         callbacks.invoke_table_row_callbacks::<WitnessLogRecord>(
@@ -1248,24 +2009,50 @@ impl __sdk::SpacetimeModule for RemoteModule {
 
     fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         agent_state_table::register_table(client_cache);
+        budget_account_record_table::register_table(client_cache);
         causal_edge_record_table::register_table(client_cache);
+        cost_attribution_record_table::register_table(client_cache);
         knowledge_record_table::register_table(client_cache);
+        learning_delta_record_table::register_table(client_cache);
         learning_session_record_table::register_table(client_cache);
         permission_grant_table::register_table(client_cache);
+        plan_record_table::register_table(client_cache);
+        policy_decision_record_table::register_table(client_cache);
+        quota_window_record_table::register_table(client_cache);
         reflexion_episode_table::register_table(client_cache);
+        report_record_table::register_table(client_cache);
+        runtime_block_record_table::register_table(client_cache);
         schedule_event_table::register_table(client_cache);
+        session_record_table::register_table(client_cache);
         skill_library_record_table::register_table(client_cache);
+        spend_ledger_record_table::register_table(client_cache);
+        state_transition_record_table::register_table(client_cache);
+        task_run_record_table::register_table(client_cache);
+        verifier_verdict_record_table::register_table(client_cache);
         witness_log_record_table::register_table(client_cache);
     }
     const ALL_TABLE_NAMES: &'static [&'static str] = &[
         "agent_state",
+        "budget_account_record",
         "causal_edge_record",
+        "cost_attribution_record",
         "knowledge_record",
+        "learning_delta_record",
         "learning_session_record",
         "permission_grant",
+        "plan_record",
+        "policy_decision_record",
+        "quota_window_record",
         "reflexion_episode",
+        "report_record",
+        "runtime_block_record",
         "schedule_event",
+        "session_record",
         "skill_library_record",
+        "spend_ledger_record",
+        "state_transition_record",
+        "task_run_record",
+        "verifier_verdict_record",
         "witness_log_record",
     ];
 }

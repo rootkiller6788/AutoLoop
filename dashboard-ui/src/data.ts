@@ -124,6 +124,49 @@ export const demoDashboardSnapshot: DashboardSessionSnapshot = {
       "Task-level judge, route correctness, and capability regression suite all passed for the current anchor.",
     failingTools: []
   },
+  business: {
+    revenueMicros: 54000,
+    costMicros: 31000,
+    profitMicros: 23000,
+    marginRatio: 0.4259,
+    slaSuccessRatio: 0.93,
+    breachedOrders: 1,
+    riskSummary: "SLA breaches detected on 1 tasks"
+  },
+  workOrders: [
+    {
+      workOrderId: "wo:cli-focus:task-1",
+      taskId: "task-1",
+      taskRole: "execution",
+      status: "delivered",
+      serviceTier: "standard"
+    },
+    {
+      workOrderId: "wo:cli-focus:task-2",
+      taskId: "task-2",
+      taskRole: "security",
+      status: "sla_breached",
+      serviceTier: "premium"
+    }
+  ],
+  revenueEvents: [
+    {
+      revenueEventId: "rev:cli-focus:task-1",
+      taskId: "task-1",
+      revenueMicros: 28000,
+      costMicros: 16000,
+      profitMicros: 12000,
+      source: "mcp::local-mcp::policy-extract"
+    },
+    {
+      revenueEventId: "rev:cli-focus:task-2",
+      taskId: "task-2",
+      revenueMicros: 26000,
+      costMicros: 15000,
+      profitMicros: 11000,
+      source: "mcp::local-mcp::browser-research"
+    }
+  ],
   operationsNotes: [
     "Proxy pressure rising on the browser-research capability",
     "Global graph snapshot is being reinforced by cross-session merges",

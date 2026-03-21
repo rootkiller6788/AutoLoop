@@ -11,11 +11,12 @@ use serde::{Deserialize, Serialize};
 use crate::config::ToolsConfig;
 
 pub use cli_forge::{
-    ApprovalStatus, CapabilityRisk, CapabilityScope, CapabilityStatus, CliAnythingForgeTool,
+    ApprovalStatus, CapabilityArtifact, CapabilityRisk, CapabilityScope, CapabilityStatus,
+    CliAnythingForgeTool,
     CapabilityDeprecationTool, CapabilityRollbackTool, CapabilityVerifierTool, CliOutputMode,
-    ForgeArgumentSpec, ForgedMcpToolManifest, ForgedToolCatalog, McpToolForgeRequest,
+    ForgeArgumentSpec, ForgedMcpToolManifest, ForgedToolCatalog, McpToolForgeRequest, Provenance,
     RenderedCommandSpec, build_command_spec,
-    sanitize_segment,
+    Sbom, SbomComponent, Signature, SignatureAlgorithm, TrustPolicy, TrustStatus, sanitize_segment,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -137,6 +138,7 @@ impl Tool for McpToolAdapter {
 pub struct ToolRegistry {
     tools: Arc<RwLock<HashMap<String, Arc<dyn Tool>>>>,
     manifests: Arc<RwLock<HashMap<String, ForgedMcpToolManifest>>>,
+    lineage_max_versions: Arc<RwLock<HashMap<String, u32>>>,
     spacetimedb: Arc<RwLock<Option<SpacetimeDb>>>,
     pub allow_shell: bool,
 }
@@ -148,6 +150,7 @@ impl ToolRegistry {
         let registry = Self {
             tools: Arc::new(RwLock::new(HashMap::new())),
             manifests: Arc::new(RwLock::new(HashMap::new())),
+            lineage_max_versions: Arc::new(RwLock::new(HashMap::new())),
             spacetimedb: Arc::new(RwLock::new(None)),
             allow_shell: config.allow_shell,
         };
@@ -205,6 +208,11 @@ impl ToolRegistry {
     }
 
     pub fn register_manifest(&self, manifest: ForgedMcpToolManifest) {
+        {
+            let mut lineage = self.lineage_max_versions.write();
+            let entry = lineage.entry(manifest.lineage_key.clone()).or_insert(0);
+            *entry = (*entry).max(manifest.version);
+        }
         self.manifests
             .write()
             .insert(manifest.registered_tool_name.clone(), manifest);
@@ -404,6 +412,15 @@ impl ToolRegistry {
         if manifest.capability_id.is_empty() {
             manifest.capability_id = format!("{}:v{}", manifest.lineage_key, manifest.version);
         }
+        let trust_findings = self.supply_chain_findings(&manifest);
+        manifest.trust_findings = trust_findings.clone();
+        manifest.trust_status = if trust_findings.is_empty() {
+            TrustStatus::Trusted
+        } else {
+            manifest.approval_status = ApprovalStatus::Rejected;
+            manifest.status = CapabilityStatus::PendingVerification;
+            TrustStatus::Rejected
+        };
 
         self.hydrate_manifest(manifest.clone());
         self.persist_manifest(&manifest).await
@@ -413,8 +430,24 @@ impl ToolRegistry {
         let Some(mut manifest) = self.manifests.read().get(tool_name).cloned() else {
             return Ok(None);
         };
+        let trust_findings = self.supply_chain_findings(&manifest);
+        manifest.trust_findings = trust_findings.clone();
+        if !trust_findings.is_empty() {
+            manifest.trust_status = TrustStatus::Rejected;
+            manifest.approval_status = ApprovalStatus::Rejected;
+            manifest.status = CapabilityStatus::PendingVerification;
+            manifest.updated_at_ms = current_time_ms();
+            self.register_manifest(manifest.clone());
+            self.persist_manifest(&manifest).await?;
+            bail!(
+                "capability '{}' failed trusted supply-chain verification: {}",
+                tool_name,
+                trust_findings.join("; ")
+            );
+        }
         manifest.status = CapabilityStatus::Active;
         manifest.approval_status = ApprovalStatus::Verified;
+        manifest.trust_status = TrustStatus::Trusted;
         manifest.health_score = manifest.health_score.max(0.8);
         manifest.approved_at_ms = Some(current_time_ms());
         manifest.updated_at_ms = current_time_ms();
@@ -488,6 +521,14 @@ impl ToolRegistry {
                     manifest.health_score
                 );
             }
+            if manifest.trust_status != TrustStatus::Trusted {
+                bail!(
+                    "capability '{}' is not trusted: trust_status={:?} findings={}",
+                    name,
+                    manifest.trust_status,
+                    manifest.trust_findings.join("; ")
+                );
+            }
         }
         let tool = self
             .get(name)
@@ -531,6 +572,26 @@ impl ToolRegistry {
         }
 
         Ok(results)
+    }
+
+    fn supply_chain_findings(&self, manifest: &ForgedMcpToolManifest) -> Vec<String> {
+        let mut findings = manifest.supply_chain_findings();
+        let lineage_max_verified = self
+            .lineage_max_versions
+            .read()
+            .get(&manifest.lineage_key)
+            .copied()
+            .unwrap_or(0);
+        if lineage_max_verified > 0 && manifest.version < lineage_max_verified {
+            findings.push(format!(
+                "version rollback detected: {} < trusted {}",
+                manifest.version, lineage_max_verified
+            ));
+        }
+        if manifest.provenance.source_ref.trim().is_empty() {
+            findings.push("provenance source_ref missing".into());
+        }
+        findings
     }
 }
 

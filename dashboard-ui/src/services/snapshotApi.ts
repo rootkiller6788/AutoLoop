@@ -25,6 +25,7 @@ function normalizeDashboardSnapshot(raw: Record<string, unknown>): DashboardSess
       : [];
   const graphRaw = asRecord(raw.graph);
   const verifierRaw = asRecord(raw.verifier);
+  const businessRaw = asRecord(raw.business);
 
   return {
     sessionId: asString(raw.sessionId ?? raw.session_id),
@@ -51,6 +52,17 @@ function normalizeDashboardSnapshot(raw: Record<string, unknown>): DashboardSess
       summary: asString(verifierRaw.summary),
       failingTools: asStringArray(verifierRaw.failingTools ?? verifierRaw.failing_tools)
     },
+    business: {
+      revenueMicros: asNumber(businessRaw.revenueMicros ?? businessRaw.revenue_micros),
+      costMicros: asNumber(businessRaw.costMicros ?? businessRaw.cost_micros),
+      profitMicros: asNumber(businessRaw.profitMicros ?? businessRaw.profit_micros),
+      marginRatio: asNumber(businessRaw.marginRatio ?? businessRaw.margin_ratio),
+      slaSuccessRatio: asNumber(businessRaw.slaSuccessRatio ?? businessRaw.sla_success_ratio),
+      breachedOrders: asNumber(businessRaw.breachedOrders ?? businessRaw.breached_orders),
+      riskSummary: asString(businessRaw.riskSummary ?? businessRaw.risk_summary)
+    },
+    workOrders: normalizeWorkOrders(raw.workOrders ?? raw.work_orders),
+    revenueEvents: normalizeRevenueEvents(raw.revenueEvents ?? raw.revenue_events),
     operationsNotes: asStringArray(raw.operationsNotes ?? raw.operations_notes),
     capabilityLifecycle: asRecord(raw.capabilityLifecycle ?? raw.capability_lifecycle),
     runtimeCircuits: asRecord(raw.runtimeCircuits ?? raw.runtime_circuits)
@@ -85,4 +97,37 @@ function asNumber(value: unknown): number {
 
 function asStringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.map((item) => String(item)) : [];
+}
+
+function normalizeWorkOrders(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.map((item) => {
+    const record = asRecord(item);
+    return {
+      workOrderId: asString(record.workOrderId ?? record.work_order_id),
+      taskId: asString(record.taskId ?? record.task_id),
+      taskRole: asString(record.taskRole ?? record.task_role),
+      status: asString(record.status),
+      serviceTier: asString(record.serviceTier ?? record.service_tier)
+    };
+  });
+}
+
+function normalizeRevenueEvents(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.map((item) => {
+    const record = asRecord(item);
+    return {
+      revenueEventId: asString(record.revenueEventId ?? record.revenue_event_id),
+      taskId: asString(record.taskId ?? record.task_id),
+      revenueMicros: asNumber(record.revenueMicros ?? record.revenue_micros),
+      costMicros: asNumber(record.costMicros ?? record.cost_micros),
+      profitMicros: asNumber(record.profitMicros ?? record.profit_micros),
+      source: asString(record.source)
+    };
+  });
 }

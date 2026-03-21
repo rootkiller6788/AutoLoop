@@ -1,3 +1,6 @@
+use std::hash::{Hash, Hasher};
+use std::collections::hash_map::DefaultHasher;
+
 use anyhow::{Result, anyhow, bail};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -54,6 +57,65 @@ pub enum CapabilityRisk {
     High,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SignatureAlgorithm {
+    DeterministicV1,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum TrustStatus {
+    Pending,
+    Trusted,
+    Rejected,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CapabilityArtifact {
+    pub artifact_id: String,
+    pub digest_sha256: String,
+    pub source_uri: String,
+    pub build_epoch: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Signature {
+    pub signer: String,
+    pub algorithm: SignatureAlgorithm,
+    pub signed_payload_hash: String,
+    pub signature: String,
+    pub signed_at_ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Provenance {
+    pub source_repo: String,
+    pub source_ref: String,
+    pub builder: String,
+    pub generated_by: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SbomComponent {
+    pub name: String,
+    pub version: String,
+    pub source: String,
+    pub checksum: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Sbom {
+    pub components: Vec<SbomComponent>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TrustPolicy {
+    pub required_signers: Vec<String>,
+    pub blocked_dependencies: Vec<String>,
+    pub min_provenance_ref_len: usize,
+}
+
 impl Default for CliOutputMode {
     fn default() -> Self {
         Self::Json
@@ -97,6 +159,14 @@ pub struct McpToolForgeRequest {
     pub scope: Option<CapabilityScope>,
     #[serde(default)]
     pub requested_by: Option<String>,
+    #[serde(default)]
+    pub signer: Option<String>,
+    #[serde(default)]
+    pub source_repo: Option<String>,
+    #[serde(default)]
+    pub source_ref: Option<String>,
+    #[serde(default)]
+    pub sbom_components: Vec<SbomComponent>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -143,17 +213,76 @@ pub struct ForgedMcpToolManifest {
     pub approved_at_ms: Option<u64>,
     #[serde(default)]
     pub rollback_to_version: Option<u32>,
+    #[serde(default = "default_trust_status")]
+    pub trust_status: TrustStatus,
+    #[serde(default)]
+    pub trust_findings: Vec<String>,
+    #[serde(default = "default_capability_artifact")]
+    pub artifact: CapabilityArtifact,
+    #[serde(default = "default_signature")]
+    pub signature: Signature,
+    #[serde(default = "default_provenance")]
+    pub provenance: Provenance,
+    #[serde(default = "default_sbom")]
+    pub sbom: Sbom,
+    #[serde(default = "default_trust_policy")]
+    pub trust_policy: TrustPolicy,
 }
 
 impl ForgedMcpToolManifest {
     pub fn is_executable(&self) -> bool {
         self.status == CapabilityStatus::Active
             && self.approval_status == ApprovalStatus::Verified
+            && self.trust_status == TrustStatus::Trusted
             && self.health_score >= 0.55
     }
 
     pub fn requires_gate(&self) -> bool {
         matches!(self.risk, CapabilityRisk::High | CapabilityRisk::Medium)
+    }
+
+    pub fn supply_chain_findings(&self) -> Vec<String> {
+        let mut findings = Vec::new();
+        let payload_hash = supply_chain_payload_hash(self);
+        if self.signature.signed_payload_hash != payload_hash {
+            findings.push("signature payload hash mismatch".into());
+        }
+        let expected_signature = signature_value_for(
+            &self.signature.signer,
+            &self.signature.algorithm,
+            &payload_hash,
+        );
+        if self.signature.signature != expected_signature {
+            findings.push("signature verification failed".into());
+        }
+        if !self
+            .trust_policy
+            .required_signers
+            .iter()
+            .any(|signer| signer == &self.signature.signer)
+        {
+            findings.push(format!(
+                "signer '{}' is not allowed by trust policy",
+                self.signature.signer
+            ));
+        }
+        if self.provenance.source_ref.len() < self.trust_policy.min_provenance_ref_len {
+            findings.push("provenance source_ref is too short".into());
+        }
+        for component in &self.sbom.components {
+            if self
+                .trust_policy
+                .blocked_dependencies
+                .iter()
+                .any(|blocked| component.name.eq_ignore_ascii_case(blocked))
+            {
+                findings.push(format!("blocked dependency detected: {}", component.name));
+            }
+            if component.checksum.trim().is_empty() {
+                findings.push(format!("dependency '{}' missing checksum", component.name));
+            }
+        }
+        findings
     }
 }
 
@@ -188,6 +317,13 @@ impl Default for ForgedMcpToolManifest {
             updated_at_ms: 0,
             approved_at_ms: None,
             rollback_to_version: None,
+            trust_status: TrustStatus::Trusted,
+            trust_findings: Vec::new(),
+            artifact: default_capability_artifact(),
+            signature: default_signature(),
+            provenance: default_provenance(),
+            sbom: default_sbom(),
+            trust_policy: default_trust_policy(),
         }
     }
 }
@@ -445,8 +581,42 @@ fn build_manifest(
         ApprovalStatus::Pending
     };
     let approved_at_ms = matches!(approval_status, ApprovalStatus::Verified).then_some(now_ms);
-
-    Ok(ForgedMcpToolManifest {
+    let signer = request.signer.unwrap_or_else(|| "autoloop-ci".into());
+    let source_repo = request
+        .source_repo
+        .unwrap_or_else(|| "autoloop/forged-capability".into());
+    let source_ref = request
+        .source_ref
+        .unwrap_or_else(|| format!("v{now_ms}"));
+    let artifact = CapabilityArtifact {
+        artifact_id: format!("artifact:{capability_id}:{now_ms}"),
+        digest_sha256: format!("{:016x}", hash_seed(&format!("{capability_id}:{command_template}:{now_ms}"))),
+        source_uri: format!("mcp://{server}/{}", sanitize_segment(&request.capability_name)),
+        build_epoch: now_ms,
+    };
+    let provenance = Provenance {
+        source_repo,
+        source_ref,
+        builder: "autoloop-cli-forge".into(),
+        generated_by: request
+            .requested_by
+            .clone()
+            .unwrap_or_else(|| "cli-agent".into()),
+    };
+    let sbom = Sbom {
+        components: if request.sbom_components.is_empty() {
+            vec![SbomComponent {
+                name: request.executable.clone(),
+                version: "latest".into(),
+                source: "local".into(),
+                checksum: format!("{:016x}", hash_seed(&request.executable)),
+            }]
+        } else {
+            request.sbom_components.clone()
+        },
+    };
+    let trust_policy = default_trust_policy();
+    let mut manifest = ForgedMcpToolManifest {
         capability_id: capability_id.clone(),
         registered_tool_name: tool_name,
         delegate_tool_name,
@@ -475,7 +645,37 @@ fn build_manifest(
         updated_at_ms: now_ms,
         approved_at_ms,
         rollback_to_version: None,
-    })
+        trust_status: TrustStatus::Pending,
+        trust_findings: Vec::new(),
+        artifact,
+        signature: default_signature(),
+        provenance,
+        sbom,
+        trust_policy,
+    };
+    let payload_hash = supply_chain_payload_hash(&manifest);
+    manifest.signature = Signature {
+        signer,
+        algorithm: SignatureAlgorithm::DeterministicV1,
+        signed_payload_hash: payload_hash.clone(),
+        signature: signature_value_for(
+            manifest.signature.signer.as_str(),
+            &SignatureAlgorithm::DeterministicV1,
+            &payload_hash,
+        ),
+        signed_at_ms: now_ms,
+    };
+    manifest.trust_findings = manifest.supply_chain_findings();
+    manifest.trust_status = if manifest.trust_findings.is_empty() {
+        TrustStatus::Trusted
+    } else {
+        TrustStatus::Rejected
+    };
+    if manifest.trust_status == TrustStatus::Rejected {
+        manifest.approval_status = ApprovalStatus::Rejected;
+        manifest.status = CapabilityStatus::PendingVerification;
+    }
+    Ok(manifest)
 }
 
 fn build_command_template(request: &McpToolForgeRequest) -> String {
@@ -745,6 +945,79 @@ fn default_health_score() -> f32 { 0.8 }
 fn default_scope() -> CapabilityScope { CapabilityScope::TaskFamily }
 fn default_risk() -> CapabilityRisk { CapabilityRisk::Low }
 fn default_requested_by() -> String { "cli-agent".into() }
+fn default_trust_status() -> TrustStatus { TrustStatus::Pending }
+fn default_capability_artifact() -> CapabilityArtifact {
+    CapabilityArtifact {
+        artifact_id: "artifact:default".into(),
+        digest_sha256: "0000000000000000".into(),
+        source_uri: "mcp://local/default".into(),
+        build_epoch: 0,
+    }
+}
+fn default_signature() -> Signature {
+    Signature {
+        signer: "autoloop-ci".into(),
+        algorithm: SignatureAlgorithm::DeterministicV1,
+        signed_payload_hash: "0000000000000000".into(),
+        signature: "sig:autoloop-ci:deterministic_v1:0000000000000000".into(),
+        signed_at_ms: 0,
+    }
+}
+fn default_provenance() -> Provenance {
+    Provenance {
+        source_repo: "autoloop/forged-capability".into(),
+        source_ref: "unknown".into(),
+        builder: "autoloop-cli-forge".into(),
+        generated_by: "cli-agent".into(),
+    }
+}
+fn default_sbom() -> Sbom { Sbom { components: Vec::new() } }
+fn default_trust_policy() -> TrustPolicy {
+    TrustPolicy {
+        required_signers: vec!["autoloop-ci".into(), "autoloop-operator".into()],
+        blocked_dependencies: vec!["evil-lib".into(), "malware-kit".into()],
+        min_provenance_ref_len: 3,
+    }
+}
+
+fn hash_seed(value: &str) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    value.hash(&mut hasher);
+    hasher.finish()
+}
+
+fn supply_chain_payload_hash(manifest: &ForgedMcpToolManifest) -> String {
+    let mut hasher = DefaultHasher::new();
+    manifest.capability_id.hash(&mut hasher);
+    manifest.registered_tool_name.hash(&mut hasher);
+    manifest.delegate_tool_name.hash(&mut hasher);
+    manifest.server.hash(&mut hasher);
+    manifest.executable.hash(&mut hasher);
+    manifest.command_template.hash(&mut hasher);
+    manifest.version.hash(&mut hasher);
+    manifest.lineage_key.hash(&mut hasher);
+    manifest.artifact.artifact_id.hash(&mut hasher);
+    manifest.artifact.digest_sha256.hash(&mut hasher);
+    manifest.artifact.source_uri.hash(&mut hasher);
+    manifest.artifact.build_epoch.hash(&mut hasher);
+    manifest.provenance.source_repo.hash(&mut hasher);
+    manifest.provenance.source_ref.hash(&mut hasher);
+    manifest.provenance.builder.hash(&mut hasher);
+    for component in &manifest.sbom.components {
+        component.name.hash(&mut hasher);
+        component.version.hash(&mut hasher);
+        component.source.hash(&mut hasher);
+        component.checksum.hash(&mut hasher);
+    }
+    format!("{:016x}", hasher.finish())
+}
+
+fn signature_value_for(signer: &str, algorithm: &SignatureAlgorithm, payload_hash: &str) -> String {
+    let algorithm_name = match algorithm {
+        SignatureAlgorithm::DeterministicV1 => "deterministic_v1",
+    };
+    format!("sig:{signer}:{algorithm_name}:{payload_hash}")
+}
 
 #[cfg(test)]
 mod tests {
@@ -926,5 +1199,158 @@ mod tests {
             .execute("mcp::local-mcp::network-deploy", r#"{"target":"prod"}"#)
             .await
             .is_err());
+    }
+
+    #[tokio::test]
+    async fn p9_signature_forgery_is_rejected() {
+        let registry = ToolRegistry::from_config(&ToolsConfig {
+            builtin: vec!["read_file".into()],
+            allow_shell: false,
+            mcp_servers: vec!["local-mcp".into()],
+        });
+        registry
+            .execute(
+                "cli::forge_mcp_tool",
+                r#"{
+                    "server":"local-mcp",
+                    "capability_name":"trusted-read",
+                    "purpose":"trusted local read tool",
+                    "executable":"read-cli",
+                    "arguments":[{"name":"path","description":"path","required":true}],
+                    "output_mode":"json"
+                }"#,
+            )
+            .await
+            .expect("forge");
+        let mut manifest = registry
+            .manifests()
+            .into_iter()
+            .find(|item| item.registered_tool_name == "mcp::local-mcp::trusted-read")
+            .expect("manifest");
+        manifest.signature.signature = "sig:forged".into();
+        registry.hydrate_manifest(manifest);
+        let verify = registry
+            .verify_capability("mcp::local-mcp::trusted-read")
+            .await;
+        assert!(verify.is_err());
+    }
+
+    #[tokio::test]
+    async fn p9_version_rollback_attack_is_rejected() {
+        let registry = ToolRegistry::from_config(&ToolsConfig {
+            builtin: vec!["read_file".into()],
+            allow_shell: false,
+            mcp_servers: vec!["local-mcp".into()],
+        });
+        registry
+            .execute(
+                "cli::forge_mcp_tool",
+                r#"{
+                    "server":"local-mcp",
+                    "capability_name":"rollback-check",
+                    "purpose":"rollback detection",
+                    "executable":"tool-cli",
+                    "arguments":[{"name":"arg","description":"arg","required":true}],
+                    "output_mode":"json"
+                }"#,
+            )
+            .await
+            .expect("forge v1");
+        let mut v2 = registry
+            .manifests()
+            .into_iter()
+            .find(|item| item.registered_tool_name == "mcp::local-mcp::rollback-check")
+            .expect("manifest");
+        v2.version = 2;
+        v2.updated_at_ms = current_time_ms().saturating_add(1);
+        let payload_hash = supply_chain_payload_hash(&v2);
+        v2.signature.signed_payload_hash = payload_hash.clone();
+        v2.signature.signature =
+            signature_value_for(&v2.signature.signer, &v2.signature.algorithm, &payload_hash);
+        registry.hydrate_manifest(v2.clone());
+        registry
+            .verify_capability("mcp::local-mcp::rollback-check")
+            .await
+            .expect("verify v2");
+
+        let mut rollback = v2;
+        rollback.version = 1;
+        rollback.updated_at_ms = current_time_ms().saturating_add(2);
+        let rollback_hash = supply_chain_payload_hash(&rollback);
+        rollback.signature.signed_payload_hash = rollback_hash.clone();
+        rollback.signature.signature = signature_value_for(
+            &rollback.signature.signer,
+            &rollback.signature.algorithm,
+            &rollback_hash,
+        );
+        registry.hydrate_manifest(rollback);
+        let verify = registry
+            .verify_capability("mcp::local-mcp::rollback-check")
+            .await;
+        assert!(verify.is_err());
+    }
+
+    #[tokio::test]
+    async fn p9_dependency_poisoning_is_rejected() {
+        let registry = ToolRegistry::from_config(&ToolsConfig {
+            builtin: vec!["read_file".into()],
+            allow_shell: false,
+            mcp_servers: vec!["local-mcp".into()],
+        });
+        let forge = registry
+            .execute(
+                "cli::forge_mcp_tool",
+                r#"{
+                    "server":"local-mcp",
+                    "capability_name":"poisoned-tool",
+                    "purpose":"test dependency poisoning guard",
+                    "executable":"tool-cli",
+                    "arguments":[{"name":"arg","description":"arg","required":true}],
+                    "sbom_components":[{"name":"evil-lib","version":"1.0.0","source":"third-party","checksum":"deadbeef"}],
+                    "output_mode":"json"
+                }"#,
+            )
+            .await
+            .expect("forge poisoned");
+        assert!(forge.content.contains("\"trust_status\": \"rejected\""));
+        let verify = registry
+            .verify_capability("mcp::local-mcp::poisoned-tool")
+            .await;
+        assert!(verify.is_err());
+    }
+
+    #[tokio::test]
+    async fn p9_unapproved_or_untrusted_capability_cannot_execute() {
+        let registry = ToolRegistry::from_config(&ToolsConfig {
+            builtin: vec!["read_file".into()],
+            allow_shell: false,
+            mcp_servers: vec!["local-mcp".into()],
+        });
+        registry
+            .execute(
+                "cli::forge_mcp_tool",
+                r#"{
+                    "server":"local-mcp",
+                    "capability_name":"strict-exec-gate",
+                    "purpose":"verify trusted gate",
+                    "executable":"tool-cli",
+                    "arguments":[{"name":"arg","description":"arg","required":true}],
+                    "output_mode":"json"
+                }"#,
+            )
+            .await
+            .expect("forge");
+        let mut manifest = registry
+            .manifests()
+            .into_iter()
+            .find(|item| item.registered_tool_name == "mcp::local-mcp::strict-exec-gate")
+            .expect("manifest");
+        manifest.trust_status = TrustStatus::Rejected;
+        manifest.trust_findings = vec!["manual reject".into()];
+        registry.hydrate_manifest(manifest);
+        let result = registry
+            .execute("mcp::local-mcp::strict-exec-gate", r#"{"arg":"x"}"#)
+            .await;
+        assert!(result.is_err());
     }
 }

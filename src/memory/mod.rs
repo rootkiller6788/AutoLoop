@@ -111,6 +111,68 @@ pub struct LearningConsolidation {
     pub capability_improvements: Vec<CapabilityImprovementProposal>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LearningProposal {
+    pub proposal_id: String,
+    pub session_id: String,
+    pub anchor: String,
+    pub hypothesis: String,
+    pub reason: String,
+    pub proposed_skill_name: String,
+    pub proposed_confidence: f32,
+    pub created_at_ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EvidencePack {
+    pub proposal_id: String,
+    pub witness_ids: Vec<String>,
+    pub episode_ids: Vec<String>,
+    pub quality_score: f32,
+    pub bias_flags: Vec<String>,
+    pub counter_evidence_count: usize,
+    pub summary: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LearningGateVerdict {
+    pub approved: bool,
+    pub reason: String,
+    pub canary_ratio: f32,
+    pub rollback_window_ms: u64,
+    pub risk_tags: Vec<String>,
+    pub created_at_ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SkillPromotionStage {
+    Canary,
+    Promoted,
+    Rejected,
+    RolledBack,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SkillPromotionRecord {
+    pub promotion_id: String,
+    pub proposal_id: String,
+    pub session_id: String,
+    pub skill_name: String,
+    pub stage: SkillPromotionStage,
+    pub reason: String,
+    pub confidence: f32,
+    pub created_at_ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum StrategyMemoryTier {
+    HotSession,
+    WarmValidated,
+    ColdArchive,
+}
+
 #[derive(Debug, Clone)]
 pub struct MemorySubsystem {
     targets: Vec<MemoryTarget>,
@@ -494,6 +556,296 @@ impl MemorySubsystem {
             capability_improvements,
         })
     }
+
+    pub fn draft_learning_proposal(
+        &self,
+        session_id: &str,
+        anchor: &str,
+        reason: &str,
+        assistant_response: &str,
+    ) -> LearningProposal {
+        let now = current_time_ms();
+        let anchor_key = normalize(anchor).replace(' ', "-");
+        let proposal_id = format!("{session_id}:{anchor_key}:{now}");
+        LearningProposal {
+            proposal_id: proposal_id.clone(),
+            session_id: session_id.to_string(),
+            anchor: anchor.to_string(),
+            hypothesis: format!(
+                "If we improve '{}' using anchored evidence, response quality should increase without violating safety.",
+                anchor
+            ),
+            reason: reason.to_string(),
+            proposed_skill_name: format!("skill-{}", anchor_key),
+            proposed_confidence: if assistant_response.to_ascii_lowercase().contains("not sure") {
+                0.45
+            } else {
+                0.72
+            },
+            created_at_ms: now,
+        }
+    }
+
+    pub async fn collect_evidence_pack(
+        &self,
+        db: &SpacetimeDb,
+        session_id: &str,
+        proposal: &LearningProposal,
+    ) -> Result<EvidencePack> {
+        let witness = db.list_witness_log_records(session_id).await?;
+        let episodes = db.list_reflexion_episodes(session_id).await?;
+        let proposal_anchor = proposal.anchor.to_ascii_lowercase();
+        let related_witness = witness
+            .iter()
+            .filter(|record| {
+                let lower = format!(
+                    "{} {}",
+                    record.detail.to_ascii_lowercase(),
+                    record.metadata_json.to_ascii_lowercase()
+                );
+                lower.contains(&proposal_anchor)
+            })
+            .collect::<Vec<_>>();
+        let related_episodes = episodes
+            .iter()
+            .filter(|record| {
+                let lower = format!(
+                    "{} {} {}",
+                    record.objective.to_ascii_lowercase(),
+                    record.hypothesis.to_ascii_lowercase(),
+                    record.lesson.to_ascii_lowercase()
+                );
+                lower.contains(&proposal_anchor)
+            })
+            .collect::<Vec<_>>();
+        let witness_ids = related_witness
+            .iter()
+            .map(|record| record.id.clone())
+            .collect::<Vec<_>>();
+        let episode_ids = related_episodes
+            .iter()
+            .map(|record| record.id.clone())
+            .collect::<Vec<_>>();
+        let negative = related_witness
+            .iter()
+            .filter(|record| record.score < 0.0)
+            .count();
+        let positive = related_witness
+            .iter()
+            .filter(|record| record.score >= 0.0)
+            .count();
+        let bias_flags = related_witness
+            .iter()
+            .filter_map(|record| {
+                let lower = record.detail.to_ascii_lowercase();
+                if lower.contains("always")
+                    || lower.contains("never")
+                    || lower.contains("only")
+                    || lower.contains("bias")
+                {
+                    Some(record.detail.clone())
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+        let quality_base = if positive + negative == 0 {
+            0.35
+        } else {
+            positive as f32 / (positive + negative) as f32
+        };
+        let diversity_bonus = (episode_ids.len().min(4) as f32) * 0.08;
+        let bias_penalty = (bias_flags.len().min(3) as f32) * 0.12;
+        let quality_score = (quality_base + diversity_bonus - bias_penalty).clamp(0.0, 1.0);
+        Ok(EvidencePack {
+            proposal_id: proposal.proposal_id.clone(),
+            witness_ids,
+            episode_ids,
+            quality_score,
+            bias_flags: bias_flags.clone(),
+            counter_evidence_count: negative,
+            summary: format!(
+                "evidence quality {:.2}, positives={}, negatives={}, bias_flags={}",
+                quality_score,
+                positive,
+                negative,
+                bias_flags.len()
+            ),
+        })
+    }
+
+    pub async fn persist_learning_proposal(
+        &self,
+        db: &SpacetimeDb,
+        proposal: &LearningProposal,
+        evidence: &EvidencePack,
+        verdict: &LearningGateVerdict,
+    ) -> Result<()> {
+        db.upsert_json_knowledge(
+            format!(
+                "memory:{}:learning-proposal:{}",
+                proposal.session_id, proposal.proposal_id
+            ),
+            &serde_json::json!({
+                "proposal": proposal,
+                "evidence": evidence,
+                "verdict": verdict,
+            }),
+            "learning-gate",
+        )
+        .await?;
+        let tier = if verdict.approved {
+            StrategyMemoryTier::WarmValidated
+        } else {
+            StrategyMemoryTier::HotSession
+        };
+        self.persist_strategy_memory_tier(
+            db,
+            &proposal.session_id,
+            tier,
+            &proposal.proposal_id,
+            &serde_json::json!({
+                "anchor": proposal.anchor,
+                "reason": proposal.reason,
+                "verdict": verdict.reason,
+                "quality_score": evidence.quality_score
+            }),
+        )
+        .await?;
+        Ok(())
+    }
+
+    pub async fn promote_skill_with_verdict(
+        &self,
+        db: &SpacetimeDb,
+        proposal: &LearningProposal,
+        verdict: &LearningGateVerdict,
+        candidate: &SkillRecord,
+    ) -> Result<SkillPromotionRecord> {
+        let now = current_time_ms();
+        let stage = if verdict.approved {
+            SkillPromotionStage::Canary
+        } else {
+            SkillPromotionStage::Rejected
+        };
+        let confidence = if verdict.approved {
+            candidate.confidence.clamp(0.45, 0.82)
+        } else {
+            0.0
+        };
+        if verdict.approved {
+            self.persist_skill(
+                db,
+                &proposal.session_id,
+                &SkillRecord {
+                    confidence,
+                    ..candidate.clone()
+                },
+            )
+            .await?;
+        }
+        let record = SkillPromotionRecord {
+            promotion_id: format!("promotion:{}:{}:{}", proposal.session_id, normalize(&candidate.name), now),
+            proposal_id: proposal.proposal_id.clone(),
+            session_id: proposal.session_id.clone(),
+            skill_name: candidate.name.clone(),
+            stage: stage.clone(),
+            reason: verdict.reason.clone(),
+            confidence,
+            created_at_ms: now,
+        };
+        db.upsert_json_knowledge(
+            format!("memory:{}:skill-promotion:{}", proposal.session_id, record.promotion_id),
+            &record,
+            "learning-promotion",
+        )
+        .await?;
+        self.persist_strategy_memory_tier(
+            db,
+            &proposal.session_id,
+            if stage == SkillPromotionStage::Canary {
+                StrategyMemoryTier::WarmValidated
+            } else {
+                StrategyMemoryTier::ColdArchive
+            },
+            &record.promotion_id,
+            &record,
+        )
+        .await?;
+        Ok(record)
+    }
+
+    pub async fn rollback_skill_promotion(
+        &self,
+        db: &SpacetimeDb,
+        session_id: &str,
+        promotion: &SkillPromotionRecord,
+        reason: &str,
+    ) -> Result<SkillPromotionRecord> {
+        let mut rolled = promotion.clone();
+        rolled.stage = SkillPromotionStage::RolledBack;
+        rolled.reason = reason.to_string();
+        rolled.confidence = 0.0;
+        rolled.created_at_ms = current_time_ms();
+        db.upsert_json_knowledge(
+            format!("memory:{session_id}:skill-promotion:{}", rolled.promotion_id),
+            &rolled,
+            "learning-promotion",
+        )
+        .await?;
+        self.persist_strategy_memory_tier(
+            db,
+            session_id,
+            StrategyMemoryTier::ColdArchive,
+            &rolled.promotion_id,
+            &rolled,
+        )
+        .await?;
+        Ok(rolled)
+    }
+
+    pub async fn persist_strategy_memory_tier<T: Serialize>(
+        &self,
+        db: &SpacetimeDb,
+        session_id: &str,
+        tier: StrategyMemoryTier,
+        key: &str,
+        payload: &T,
+    ) -> Result<()> {
+        let tier_key = match tier {
+            StrategyMemoryTier::HotSession => "hot",
+            StrategyMemoryTier::WarmValidated => "warm",
+            StrategyMemoryTier::ColdArchive => "cold",
+        };
+        db.upsert_json_knowledge(
+            format!("memory:strategy:{tier_key}:{session_id}:{}", normalize(key)),
+            payload,
+            "strategy-memory",
+        )
+        .await?;
+        Ok(())
+    }
+
+    pub async fn strategy_memory_layers(&self, db: &SpacetimeDb, session_id: &str) -> Result<serde_json::Value> {
+        let hot = db
+            .list_knowledge_by_prefix(&format!("memory:strategy:hot:{session_id}:"))
+            .await?;
+        let warm = db
+            .list_knowledge_by_prefix(&format!("memory:strategy:warm:{session_id}:"))
+            .await?;
+        let cold = db
+            .list_knowledge_by_prefix(&format!("memory:strategy:cold:{session_id}:"))
+            .await?;
+        Ok(serde_json::json!({
+            "session_id": session_id,
+            "hot_count": hot.len(),
+            "warm_count": warm.len(),
+            "cold_count": cold.len(),
+            "hot_keys": hot.iter().map(|r| r.key.clone()).take(10).collect::<Vec<_>>(),
+            "warm_keys": warm.iter().map(|r| r.key.clone()).take(10).collect::<Vec<_>>(),
+            "cold_keys": cold.iter().map(|r| r.key.clone()).take(10).collect::<Vec<_>>(),
+        }))
+    }
 }
 
 fn consolidate_skills(
@@ -833,5 +1185,66 @@ mod tests {
 
         assert!(!consolidation.failure_clusters.is_empty());
         assert!(!consolidation.capability_improvements.is_empty());
+    }
+
+    #[tokio::test]
+    async fn p12_promotion_pipeline_supports_canary_and_rollback_with_strategy_tiers() {
+        let config = AppConfig::default();
+        let memory = MemorySubsystem::from_config(&config.memory, &config.learning);
+        let db = SpacetimeDb::from_config(&SpacetimeDbConfig {
+            enabled: true,
+            backend: SpacetimeBackend::InMemory,
+            uri: "http://spacetimedb:3000".into(),
+            module_name: "autoloop_core".into(),
+            namespace: "autoloop".into(),
+            pool_size: 4,
+        });
+        let proposal = memory.draft_learning_proposal(
+            "session-p12-promote",
+            "routing",
+            "improve route stability",
+            "use verified evidence",
+        );
+        let approved = LearningGateVerdict {
+            approved: true,
+            reason: "approved".into(),
+            canary_ratio: 0.1,
+            rollback_window_ms: 900_000,
+            risk_tags: vec![],
+            created_at_ms: current_time_ms(),
+        };
+        let promotion = memory
+            .promote_skill_with_verdict(
+                &db,
+                &proposal,
+                &approved,
+                &SkillRecord {
+                    name: "skill-routing".into(),
+                    trigger: "routing".into(),
+                    procedure: "use evidence-aware route scoring".into(),
+                    confidence: 0.77,
+                },
+            )
+            .await
+            .expect("promote");
+        assert_eq!(promotion.stage, SkillPromotionStage::Canary);
+
+        let rolled = memory
+            .rollback_skill_promotion(
+                &db,
+                "session-p12-promote",
+                &promotion,
+                "regression detected",
+            )
+            .await
+            .expect("rollback");
+        assert_eq!(rolled.stage, SkillPromotionStage::RolledBack);
+
+        let layers = memory
+            .strategy_memory_layers(&db, "session-p12-promote")
+            .await
+            .expect("layers");
+        assert!(layers["warm_count"].as_u64().unwrap_or(0) >= 1);
+        assert!(layers["cold_count"].as_u64().unwrap_or(0) >= 1);
     }
 }

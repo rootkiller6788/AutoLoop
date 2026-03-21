@@ -4,7 +4,9 @@ use serde::Serialize;
 
 use crate::{
     config::HooksConfig,
+    memory::{LearningProposal, MemorySubsystem, SkillPromotionRecord, SkillRecord},
     runtime::IterationRecord,
+    security::SecurityPolicy,
     tools::ExecutionStep,
 };
 
@@ -26,6 +28,14 @@ pub struct IterationLearningHook {
     pub proposal_anchor: String,
     pub actions: Vec<ExecutionStep>,
     pub reason: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct GovernedLearningOutcome {
+    pub proposal: LearningProposal,
+    pub verdict_reason: String,
+    pub approved: bool,
+    pub promotion: Option<SkillPromotionRecord>,
 }
 
 #[derive(Debug, Clone)]
@@ -153,6 +163,96 @@ impl HookRegistry {
 
         hooks
     }
+
+    pub async fn run_governed_learning_pipeline(
+        &self,
+        db: &SpacetimeDb,
+        memory: &MemorySubsystem,
+        security: &SecurityPolicy,
+        session_id: &str,
+        actor_id: &str,
+        user_input: &str,
+        assistant_response: &str,
+    ) -> Result<Vec<GovernedLearningOutcome>> {
+        let tasks = self.plan_learning_tasks(user_input, assistant_response);
+        let mut outcomes = Vec::new();
+        if tasks.is_empty() {
+            return Ok(outcomes);
+        }
+        if !db
+            .has_permission(actor_id, autoloop_spacetimedb_adapter::PermissionAction::Dispatch)
+            .await?
+        {
+            return Ok(outcomes);
+        }
+
+        for task in tasks {
+            let proposal = memory.draft_learning_proposal(
+                session_id,
+                &task.anchor,
+                &task.reason,
+                assistant_response,
+            );
+            let evidence = memory.collect_evidence_pack(db, session_id, &proposal).await?;
+            let verdict = security.evaluate_learning_gate(&proposal, &evidence);
+            memory
+                .persist_learning_proposal(db, &proposal, &evidence, &verdict)
+                .await?;
+
+            let mut promotion = None;
+            if verdict.approved {
+                let candidate = SkillRecord {
+                    name: proposal.proposed_skill_name.clone(),
+                    trigger: proposal.anchor.clone(),
+                    procedure: format!(
+                        "Apply anchored reasoning for '{}' with verifier-first checks and bounded retries.",
+                        proposal.anchor
+                    ),
+                    confidence: proposal.proposed_confidence,
+                };
+                let promoted = memory
+                    .promote_skill_with_verdict(db, &proposal, &verdict, &candidate)
+                    .await?;
+                db.create_schedule_event(
+                    session_id.to_string(),
+                    "hooks.learning_canary".into(),
+                    "mcp::local-mcp::invoke".into(),
+                    serde_json::json!({
+                        "proposal_id": proposal.proposal_id,
+                        "skill_name": promoted.skill_name,
+                        "canary_ratio": verdict.canary_ratio,
+                        "rollback_window_ms": verdict.rollback_window_ms,
+                    })
+                    .to_string(),
+                    actor_id.to_string(),
+                )
+                .await?;
+                promotion = Some(promoted);
+            } else {
+                db.create_schedule_event(
+                    session_id.to_string(),
+                    "hooks.learning_rejected".into(),
+                    "mcp::local-mcp::invoke".into(),
+                    serde_json::json!({
+                        "proposal_id": proposal.proposal_id,
+                        "reason": verdict.reason,
+                    })
+                    .to_string(),
+                    actor_id.to_string(),
+                )
+                .await?;
+            }
+
+            outcomes.push(GovernedLearningOutcome {
+                proposal,
+                verdict_reason: verdict.reason,
+                approved: verdict.approved,
+                promotion,
+            });
+        }
+
+        Ok(outcomes)
+    }
 }
 
 fn extract_anchors(user_input: &str) -> Vec<String> {
@@ -191,6 +291,7 @@ fn response_signals_uncertainty(response: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{config::AppConfig, memory::MemorySubsystem, security::SecurityPolicy};
     use autoloop_spacetimedb_adapter::{PermissionAction, SpacetimeBackend, SpacetimeDbConfig};
 
     #[test]
@@ -249,5 +350,50 @@ mod tests {
         assert!(!tasks.is_empty());
         assert_eq!(events.len(), tasks.len());
         assert!(events.iter().all(|event| event.topic == "hooks.self_learn"));
+    }
+
+    #[tokio::test]
+    async fn p12_governed_pipeline_rejects_low_quality_skill_promotion() {
+        let config = AppConfig::default();
+        let hooks = HookRegistry {
+            hooks: vec![HookSpec {
+                name: "self-learn".into(),
+            }],
+            learning_hooks_enabled: true,
+        };
+        let memory = MemorySubsystem::from_config(&config.memory, &config.learning);
+        let security = SecurityPolicy::from_config(&config.security);
+        let db = SpacetimeDb::from_config(&SpacetimeDbConfig {
+            enabled: true,
+            backend: SpacetimeBackend::InMemory,
+            uri: "http://spacetimedb:3000".into(),
+            module_name: "autoloop_core".into(),
+            namespace: "autoloop".into(),
+            pool_size: 4,
+        });
+        db.grant_permissions("agent-1", vec![PermissionAction::Dispatch])
+            .await
+            .expect("grant");
+
+        let outcomes = hooks
+            .run_governed_learning_pipeline(
+                &db,
+                &memory,
+                &security,
+                "session-p12-low-quality",
+                "agent-1",
+                "Investigate anchor:memory-quality",
+                "I am not sure and need more data before any conclusion.",
+            )
+            .await
+            .expect("pipeline");
+
+        assert!(!outcomes.is_empty());
+        assert!(outcomes.iter().all(|outcome| !outcome.approved));
+        let skills = db
+            .list_skill_library_records("session-p12-low-quality")
+            .await
+            .expect("skills");
+        assert!(skills.is_empty());
     }
 }

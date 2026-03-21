@@ -42,6 +42,8 @@ pub struct GraphRoutingSignals {
     pub needs_more_extraction: bool,
     pub prefers_mcp_execution: bool,
     pub prefers_cli_execution: bool,
+    pub strategy_warm_count: usize,
+    pub strategy_cold_count: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -162,6 +164,31 @@ impl RagSubsystem {
             needs_more_extraction: entity_count < 4 || relationship_count < 3,
             prefers_mcp_execution,
             prefers_cli_execution,
+            strategy_warm_count: 0,
+            strategy_cold_count: 0,
+        }
+    }
+
+    pub fn apply_strategy_memory_layers(
+        &self,
+        signals: &mut GraphRoutingSignals,
+        strategy_layers: &serde_json::Value,
+    ) {
+        let warm = strategy_layers
+            .get("warm_count")
+            .and_then(serde_json::Value::as_u64)
+            .unwrap_or(0) as usize;
+        let cold = strategy_layers
+            .get("cold_count")
+            .and_then(serde_json::Value::as_u64)
+            .unwrap_or(0) as usize;
+        signals.strategy_warm_count = warm;
+        signals.strategy_cold_count = cold;
+        if warm >= 3 {
+            signals.prefers_mcp_execution = true;
+        }
+        if cold >= warm.saturating_add(2) {
+            signals.needs_more_extraction = true;
         }
     }
 

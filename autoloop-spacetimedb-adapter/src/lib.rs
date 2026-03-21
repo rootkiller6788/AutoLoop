@@ -483,6 +483,127 @@ pub struct PermissionGrant {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Tenant {
+    pub tenant_id: String,
+    pub name: String,
+    pub status: String,
+    pub created_at_ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Principal {
+    pub principal_id: String,
+    pub tenant_id: String,
+    pub principal_type: String,
+    pub status: String,
+    pub created_at_ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RoleBinding {
+    pub tenant_id: String,
+    pub principal_id: String,
+    pub role: String,
+    pub updated_at_ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PolicyBinding {
+    pub policy_id: String,
+    pub tenant_id: String,
+    pub role: String,
+    pub allowed_actions: Vec<PermissionAction>,
+    pub capability_prefixes: Vec<String>,
+    pub max_memory_mb: u32,
+    pub max_tokens: u32,
+    pub updated_at_ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SessionLease {
+    pub lease_token: String,
+    pub session_id: String,
+    pub tenant_id: String,
+    pub principal_id: String,
+    pub policy_id: String,
+    pub expires_at_ms: u64,
+    pub issued_at_ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BudgetAccount {
+    pub account_id: String,
+    pub tenant_id: String,
+    pub principal_id: String,
+    pub policy_id: String,
+    pub total_budget_micros: u64,
+    pub reserved_micros: u64,
+    pub spent_micros: u64,
+    pub blocked_count: u64,
+    pub updated_at_ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SpendLedgerKind {
+    Reserve,
+    Settle,
+    Refund,
+    Blocked,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SpendLedger {
+    pub ledger_id: String,
+    pub tenant_id: String,
+    pub account_id: String,
+    pub session_id: String,
+    pub trace_id: String,
+    pub task_id: String,
+    pub capability_id: String,
+    pub kind: SpendLedgerKind,
+    pub amount_micros: i64,
+    pub token_cost_micros: u64,
+    pub tool_cost_micros: u64,
+    pub duration_cost_micros: u64,
+    pub reason: String,
+    pub created_at_ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct QuotaWindow {
+    pub window_id: String,
+    pub tenant_id: String,
+    pub account_id: String,
+    pub window_start_ms: u64,
+    pub window_end_ms: u64,
+    pub window_budget_micros: u64,
+    pub consumed_micros: u64,
+    pub blocked_count: u64,
+    pub updated_at_ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CostAttribution {
+    pub attribution_id: String,
+    pub tenant_id: String,
+    pub principal_id: String,
+    pub policy_id: String,
+    pub session_id: String,
+    pub trace_id: String,
+    pub task_id: String,
+    pub capability_id: String,
+    pub provider_tokens: u32,
+    pub tool_invocations: u32,
+    pub duration_ms: u64,
+    pub token_cost_micros: u64,
+    pub tool_cost_micros: u64,
+    pub duration_cost_micros: u64,
+    pub total_cost_micros: u64,
+    pub settled_at_ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReflexionEpisodeRecord {
     pub id: String,
     pub session_id: String,
@@ -1329,6 +1450,241 @@ impl SpacetimeDb {
         self.repo.grant_permissions(actor_id.into(), permissions).await
     }
 
+    pub async fn upsert_tenant(&self, tenant: Tenant) -> Result<Tenant> {
+        self.upsert_json_knowledge(
+            format!("identity:tenant:{}", tenant.tenant_id),
+            &tenant,
+            "identity",
+        )
+        .await?;
+        Ok(tenant)
+    }
+
+    pub async fn get_tenant(&self, tenant_id: &str) -> Result<Option<Tenant>> {
+        Ok(self
+            .get_knowledge(&format!("identity:tenant:{tenant_id}"))
+            .await?
+            .and_then(|record| serde_json::from_str::<Tenant>(&record.value).ok()))
+    }
+
+    pub async fn upsert_principal(&self, principal: Principal) -> Result<Principal> {
+        self.upsert_json_knowledge(
+            format!("identity:principal:{}:{}", principal.tenant_id, principal.principal_id),
+            &principal,
+            "identity",
+        )
+        .await?;
+        Ok(principal)
+    }
+
+    pub async fn get_principal(
+        &self,
+        tenant_id: &str,
+        principal_id: &str,
+    ) -> Result<Option<Principal>> {
+        Ok(self
+            .get_knowledge(&format!("identity:principal:{tenant_id}:{principal_id}"))
+            .await?
+            .and_then(|record| serde_json::from_str::<Principal>(&record.value).ok()))
+    }
+
+    pub async fn upsert_role_binding(&self, binding: RoleBinding) -> Result<RoleBinding> {
+        self.upsert_json_knowledge(
+            format!(
+                "identity:role-binding:{}:{}",
+                binding.tenant_id, binding.principal_id
+            ),
+            &binding,
+            "identity",
+        )
+        .await?;
+        Ok(binding)
+    }
+
+    pub async fn get_role_binding(
+        &self,
+        tenant_id: &str,
+        principal_id: &str,
+    ) -> Result<Option<RoleBinding>> {
+        Ok(self
+            .get_knowledge(&format!("identity:role-binding:{tenant_id}:{principal_id}"))
+            .await?
+            .and_then(|record| serde_json::from_str::<RoleBinding>(&record.value).ok()))
+    }
+
+    pub async fn upsert_policy_binding(&self, binding: PolicyBinding) -> Result<PolicyBinding> {
+        self.upsert_json_knowledge(
+            format!("identity:policy-binding:{}:{}", binding.tenant_id, binding.policy_id),
+            &binding,
+            "identity",
+        )
+        .await?;
+        Ok(binding)
+    }
+
+    pub async fn get_policy_binding(
+        &self,
+        tenant_id: &str,
+        policy_id: &str,
+    ) -> Result<Option<PolicyBinding>> {
+        Ok(self
+            .get_knowledge(&format!("identity:policy-binding:{tenant_id}:{policy_id}"))
+            .await?
+            .and_then(|record| serde_json::from_str::<PolicyBinding>(&record.value).ok()))
+    }
+
+    pub async fn upsert_session_lease(&self, lease: SessionLease) -> Result<SessionLease> {
+        self.upsert_json_knowledge(
+            format!("identity:session-lease:{}", lease.session_id),
+            &lease,
+            "identity",
+        )
+        .await?;
+        Ok(lease)
+    }
+
+    pub async fn get_session_lease(&self, session_id: &str) -> Result<Option<SessionLease>> {
+        Ok(self
+            .get_knowledge(&format!("identity:session-lease:{session_id}"))
+            .await?
+            .and_then(|record| serde_json::from_str::<SessionLease>(&record.value).ok()))
+    }
+
+    pub async fn upsert_budget_account(&self, account: BudgetAccount) -> Result<BudgetAccount> {
+        self.upsert_json_knowledge(
+            format!("billing:budget-account:{}:{}", account.tenant_id, account.account_id),
+            &account,
+            "billing",
+        )
+        .await?;
+        Ok(account)
+    }
+
+    pub async fn get_budget_account(
+        &self,
+        tenant_id: &str,
+        account_id: &str,
+    ) -> Result<Option<BudgetAccount>> {
+        Ok(self
+            .get_knowledge(&format!("billing:budget-account:{tenant_id}:{account_id}"))
+            .await?
+            .and_then(|record| serde_json::from_str::<BudgetAccount>(&record.value).ok()))
+    }
+
+    pub async fn append_spend_ledger(&self, entry: SpendLedger) -> Result<SpendLedger> {
+        let key = format!(
+            "billing:spend-ledger:{}:{}:{}",
+            entry.tenant_id, entry.account_id, entry.ledger_id
+        );
+        if self.get_knowledge(&key).await?.is_some() {
+            bail!("spend ledger {} already exists", entry.ledger_id);
+        }
+        self.upsert_json_knowledge(key, &entry, "billing").await?;
+        Ok(entry)
+    }
+
+    pub async fn list_spend_ledger(
+        &self,
+        tenant_id: &str,
+        account_id: &str,
+    ) -> Result<Vec<SpendLedger>> {
+        let prefix = format!("billing:spend-ledger:{tenant_id}:{account_id}:");
+        let mut entries = self
+            .list_knowledge_by_prefix(&prefix)
+            .await?
+            .into_iter()
+            .filter_map(|record| serde_json::from_str::<SpendLedger>(&record.value).ok())
+            .collect::<Vec<_>>();
+        entries.sort_by_key(|entry| entry.created_at_ms);
+        Ok(entries)
+    }
+
+    pub async fn list_spend_ledger_by_task(
+        &self,
+        session_id: &str,
+        task_id: &str,
+    ) -> Result<Vec<SpendLedger>> {
+        let mut entries = self
+            .list_knowledge_by_prefix("billing:spend-ledger:")
+            .await?
+            .into_iter()
+            .filter_map(|record| serde_json::from_str::<SpendLedger>(&record.value).ok())
+            .filter(|entry| entry.session_id == session_id && entry.task_id == task_id)
+            .collect::<Vec<_>>();
+        entries.sort_by_key(|entry| entry.created_at_ms);
+        Ok(entries)
+    }
+
+    pub async fn upsert_quota_window(&self, window: QuotaWindow) -> Result<QuotaWindow> {
+        self.upsert_json_knowledge(
+            format!("billing:quota-window:{}:{}:{}", window.tenant_id, window.account_id, window.window_id),
+            &window,
+            "billing",
+        )
+        .await?;
+        Ok(window)
+    }
+
+    pub async fn get_quota_window(
+        &self,
+        tenant_id: &str,
+        account_id: &str,
+        window_id: &str,
+    ) -> Result<Option<QuotaWindow>> {
+        Ok(self
+            .get_knowledge(&format!(
+                "billing:quota-window:{tenant_id}:{account_id}:{window_id}"
+            ))
+            .await?
+            .and_then(|record| serde_json::from_str::<QuotaWindow>(&record.value).ok()))
+    }
+
+    pub async fn upsert_cost_attribution(
+        &self,
+        attribution: CostAttribution,
+    ) -> Result<CostAttribution> {
+        self.upsert_json_knowledge(
+            format!(
+                "billing:cost-attribution:{}:{}:{}",
+                attribution.tenant_id, attribution.session_id, attribution.attribution_id
+            ),
+            &attribution,
+            "billing",
+        )
+        .await?;
+        Ok(attribution)
+    }
+
+    pub async fn get_cost_attribution(
+        &self,
+        tenant_id: &str,
+        session_id: &str,
+        attribution_id: &str,
+    ) -> Result<Option<CostAttribution>> {
+        Ok(self
+            .get_knowledge(&format!(
+                "billing:cost-attribution:{tenant_id}:{session_id}:{attribution_id}"
+            ))
+            .await?
+            .and_then(|record| serde_json::from_str::<CostAttribution>(&record.value).ok()))
+    }
+
+    pub async fn list_cost_attribution_by_session(
+        &self,
+        tenant_id: &str,
+        session_id: &str,
+    ) -> Result<Vec<CostAttribution>> {
+        let prefix = format!("billing:cost-attribution:{tenant_id}:{session_id}:");
+        let mut records = self
+            .list_knowledge_by_prefix(&prefix)
+            .await?
+            .into_iter()
+            .filter_map(|record| serde_json::from_str::<CostAttribution>(&record.value).ok())
+            .collect::<Vec<_>>();
+        records.sort_by_key(|record| record.settled_at_ms);
+        Ok(records)
+    }
+
     pub async fn upsert_reflexion_episode(
         &self,
         record: ReflexionEpisodeRecord,
@@ -1421,5 +1777,209 @@ mod tests {
 
         assert_eq!(knowledge.key, "anchor:rust");
         assert!(db.get_knowledge("anchor:rust").await.expect("knowledge read").is_some());
+    }
+
+    #[tokio::test]
+    async fn identity_schema_crud_works_for_tenant_principal_policy_and_lease() {
+        let db = SpacetimeDb::from_config(&SpacetimeDbConfig {
+            enabled: true,
+            backend: SpacetimeBackend::InMemory,
+            uri: "http://spacetimedb:3000".into(),
+            module_name: "autoloop_core".into(),
+            namespace: "autoloop".into(),
+            pool_size: 4,
+        });
+        let tenant = db
+            .upsert_tenant(Tenant {
+                tenant_id: "tenant-a".into(),
+                name: "Tenant A".into(),
+                status: "active".into(),
+                created_at_ms: 1,
+            })
+            .await
+            .expect("tenant");
+        db.upsert_principal(Principal {
+            principal_id: "principal-a".into(),
+            tenant_id: tenant.tenant_id.clone(),
+            principal_type: "user".into(),
+            status: "active".into(),
+            created_at_ms: 2,
+        })
+        .await
+        .expect("principal");
+        db.upsert_role_binding(RoleBinding {
+            tenant_id: tenant.tenant_id.clone(),
+            principal_id: "principal-a".into(),
+            role: "operator".into(),
+            updated_at_ms: 3,
+        })
+        .await
+        .expect("role");
+        db.upsert_policy_binding(PolicyBinding {
+            policy_id: "policy-a".into(),
+            tenant_id: tenant.tenant_id.clone(),
+            role: "operator".into(),
+            allowed_actions: vec![PermissionAction::Read, PermissionAction::Dispatch],
+            capability_prefixes: vec!["provider:".into(), "mcp::local-mcp::".into()],
+            max_memory_mb: 1024,
+            max_tokens: 8000,
+            updated_at_ms: 4,
+        })
+        .await
+        .expect("policy");
+        db.upsert_session_lease(SessionLease {
+            lease_token: "lease-a".into(),
+            session_id: "session-a".into(),
+            tenant_id: tenant.tenant_id.clone(),
+            principal_id: "principal-a".into(),
+            policy_id: "policy-a".into(),
+            expires_at_ms: 9_999,
+            issued_at_ms: 5,
+        })
+        .await
+        .expect("lease");
+
+        assert!(db
+            .get_tenant("tenant-a")
+            .await
+            .expect("tenant get")
+            .is_some());
+        assert!(db
+            .get_principal("tenant-a", "principal-a")
+            .await
+            .expect("principal get")
+            .is_some());
+        assert!(db
+            .get_policy_binding("tenant-a", "policy-a")
+            .await
+            .expect("policy get")
+            .is_some());
+        assert!(db
+            .get_session_lease("session-a")
+            .await
+            .expect("lease get")
+            .is_some());
+    }
+
+    #[tokio::test]
+    async fn billing_schema_append_only_and_replay_work() {
+        let db = SpacetimeDb::from_config(&SpacetimeDbConfig {
+            enabled: true,
+            backend: SpacetimeBackend::InMemory,
+            uri: "http://spacetimedb:3000".into(),
+            module_name: "autoloop_core".into(),
+            namespace: "autoloop".into(),
+            pool_size: 4,
+        });
+        db.upsert_budget_account(BudgetAccount {
+            account_id: "account-a".into(),
+            tenant_id: "tenant-a".into(),
+            principal_id: "principal-a".into(),
+            policy_id: "policy-a".into(),
+            total_budget_micros: 100_000,
+            reserved_micros: 20_000,
+            spent_micros: 10_000,
+            blocked_count: 0,
+            updated_at_ms: 1,
+        })
+        .await
+        .expect("budget account");
+        db.append_spend_ledger(SpendLedger {
+            ledger_id: "l1".into(),
+            tenant_id: "tenant-a".into(),
+            account_id: "account-a".into(),
+            session_id: "session-a".into(),
+            trace_id: "trace-a".into(),
+            task_id: "task-a".into(),
+            capability_id: "provider:default".into(),
+            kind: SpendLedgerKind::Reserve,
+            amount_micros: 5_000,
+            token_cost_micros: 3_000,
+            tool_cost_micros: 1_000,
+            duration_cost_micros: 1_000,
+            reason: "precharge".into(),
+            created_at_ms: 2,
+        })
+        .await
+        .expect("ledger reserve");
+        db.append_spend_ledger(SpendLedger {
+            ledger_id: "l2".into(),
+            tenant_id: "tenant-a".into(),
+            account_id: "account-a".into(),
+            session_id: "session-a".into(),
+            trace_id: "trace-a".into(),
+            task_id: "task-a".into(),
+            capability_id: "provider:default".into(),
+            kind: SpendLedgerKind::Settle,
+            amount_micros: 4_500,
+            token_cost_micros: 3_000,
+            tool_cost_micros: 500,
+            duration_cost_micros: 1_000,
+            reason: "settled".into(),
+            created_at_ms: 3,
+        })
+        .await
+        .expect("ledger settle");
+        db.upsert_quota_window(QuotaWindow {
+            window_id: "w1".into(),
+            tenant_id: "tenant-a".into(),
+            account_id: "account-a".into(),
+            window_start_ms: 0,
+            window_end_ms: 10_000,
+            window_budget_micros: 50_000,
+            consumed_micros: 4_500,
+            blocked_count: 0,
+            updated_at_ms: 3,
+        })
+        .await
+        .expect("quota");
+        db.upsert_cost_attribution(CostAttribution {
+            attribution_id: "a1".into(),
+            tenant_id: "tenant-a".into(),
+            principal_id: "principal-a".into(),
+            policy_id: "policy-a".into(),
+            session_id: "session-a".into(),
+            trace_id: "trace-a".into(),
+            task_id: "task-a".into(),
+            capability_id: "provider:default".into(),
+            provider_tokens: 300,
+            tool_invocations: 0,
+            duration_ms: 120,
+            token_cost_micros: 3_000,
+            tool_cost_micros: 500,
+            duration_cost_micros: 1_000,
+            total_cost_micros: 4_500,
+            settled_at_ms: 3,
+        })
+        .await
+        .expect("attribution");
+
+        let replay = db
+            .list_spend_ledger("tenant-a", "account-a")
+            .await
+            .expect("ledger replay");
+        assert_eq!(replay.len(), 2);
+        assert_eq!(replay[0].ledger_id, "l1");
+        assert_eq!(replay[1].ledger_id, "l2");
+        assert_eq!(replay[1].kind, SpendLedgerKind::Settle);
+        assert!(db
+            .append_spend_ledger(SpendLedger {
+                ledger_id: "l2".into(),
+                tenant_id: "tenant-a".into(),
+                account_id: "account-a".into(),
+                session_id: "session-a".into(),
+                trace_id: "trace-a".into(),
+                task_id: "task-a".into(),
+                capability_id: "provider:default".into(),
+                kind: SpendLedgerKind::Settle,
+                amount_micros: 1,
+                token_cost_micros: 0,
+                tool_cost_micros: 0,
+                duration_cost_micros: 0,
+                reason: "duplicate".into(),
+                created_at_ms: 4,
+            })
+            .await
+            .is_err());
     }
 }
