@@ -3,7 +3,8 @@
 [![Tests](https://img.shields.io/badge/tests-56%20passed-brightgreen)](https://github.com/rootkiller6788/AutoLoop/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/badge/release-v0.1.0--alpha-blue)](https://github.com/rootkiller6788/AutoLoop/releases/tag/v0.1.0-alpha)
 
-<img width="1077" height="507" alt="image" src="https://github.com/user-attachments/assets/eca92030-482c-4b2d-9380-992eca8466bf" />
+<img width="1407" height="768" alt="image" src="https://github.com/user-attachments/assets/128e8b6a-70bb-4d7c-93f2-5070a4a907e3" />
+
 
 
 ## What is AutoLoop?
